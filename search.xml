@@ -215,6 +215,9 @@
 <p>Symbols在JDK7和JDK8里都在native memory里，但不在Metaspace里。<br>Symbols在native memory里通过引用计数管理，同时有个全局的SymbolTable管理着所有Symbol。</p>
 </blockquote>
 ]]></content>
+      <categories>
+        <category>JVM</category>
+      </categories>
       <tags>
         <tag>常量池</tag>
         <tag>JVM</tag>
