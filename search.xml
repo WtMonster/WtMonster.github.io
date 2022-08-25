@@ -216,7 +216,9 @@
 </blockquote>
 ]]></content>
       <tags>
-        <tag>字符串常量池</tag>
+        <tag>常量池</tag>
+        <tag>JVM</tag>
+        <tag>HotSpot</tag>
       </tags>
   </entry>
 </search>
