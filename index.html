@@ -209,7 +209,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-08-25 13:41:10" itemprop="dateModified" datetime="2022-08-25T13:41:10+08:00">2022-08-25</time>
+                <time title="修改时间：2022-08-25 13:46:57" itemprop="dateModified" datetime="2022-08-25T13:46:57+08:00">2022-08-25</time>
               </span>
 
           
@@ -223,8 +223,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>JDK1.8-1.9,String底层从char数组变成了byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
-<h2 id="关于常量池"><a href="#关于常量池" class="headerlink" title="关于常量池"></a>关于常量池</h2><h3 id="常量池-x2F-Class常量池（Constant-pool）"><a href="#常量池-x2F-Class常量池（Constant-pool）" class="headerlink" title="常量池&#x2F;Class常量池（Constant pool）"></a>常量池&#x2F;Class常量池（Constant pool）</h3><p>常量池,也叫 Class 常量池(常量池&#x3D;&#x3D;Class常量池)。Java文件被编译成 Class文件，Class文件中除了包含类的版本、字段、方法、接口等描述信息外，还有一项就是常量池，常量池是当Class文件被Java虚拟机加载进来后存放在方法区 各种字面量 (Literal)和 符号引用 。</p>
+          <h2 id="关于常量池"><a href="#关于常量池" class="headerlink" title="关于常量池"></a>关于常量池</h2><h3 id="常量池-x2F-Class常量池（Constant-pool）"><a href="#常量池-x2F-Class常量池（Constant-pool）" class="headerlink" title="常量池&#x2F;Class常量池（Constant pool）"></a>常量池&#x2F;Class常量池（Constant pool）</h3><p>常量池,也叫 Class 常量池(常量池&#x3D;&#x3D;Class常量池)。Java文件被编译成 Class文件，Class文件中除了包含类的版本、字段、方法、接口等描述信息外，还有一项就是常量池，常量池是当Class文件被Java虚拟机加载进来后存放在方法区 各种字面量 (Literal)和 符号引用 。</p>
 <p><img src="file://D:/Coding%20files/TyporaNotes/%E8%BF%9B%E9%98%B6/images/jvm-%E5%B0%9A%E7%A1%85%E8%B0%B7/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aSn5rC05oCq5LiA5Y-3,size_20,color_FFFFFF,t_70,g_se,x_16%23pic_center.png?lastModify=1661405748" alt="在这里插入图片描述"></p>
 <h3 id="运行时常量池（Runtime-constant-pool）"><a href="#运行时常量池（Runtime-constant-pool）" class="headerlink" title="运行时常量池（Runtime constant pool）"></a>运行时常量池（Runtime constant pool）</h3><p>运行时常量池是方法区的一部分。运行时常量池是当Class文件被加载到内存后，Java虚拟机会 **将Class文件常量池里的内容转移到运行时常量池里(运行时常量池也是每个类都有一个)**。运行时常量池相对于Class文件常量池的另外一个重要特征是具备动态性，Java语言并不要求常量一定只有编译期才能产生，也就是并非预置入Class文件中常量池的内容才能进入方法区运行时常量池，运行期间也可能将新的常量放入池中</p>
 <p><strong>只存放字符串引用</strong></p>
@@ -243,6 +242,8 @@
 <blockquote>
 <p>字符串常量池（StringTable）在native memory</p>
 </blockquote>
+</li>
+<li><p>JDK1.8-1.9,String底层从char数组变成了byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
 </li>
 <li><p>补充：</p>
 <ul>
