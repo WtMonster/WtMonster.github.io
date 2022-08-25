@@ -31,7 +31,7 @@ _config.yml  crowdin.yml  docs  gulpfile.js  languages  layout  LICENSE.md  pack
 <pre><code class="sh">$ cd themes/next/source/lib/pjax
 $ git pull
 </code></pre>
-<h1 id="Pjax"><a href="#Pjax" class="headerlink" title="Pjax"></a>Pjax</h1><p><a href="https://travis-ci.org/MoOx/pjax"><img src="https://img.shields.io/travis/MoOx/pjax.svg" alt="Build Status"></a>.</p>
+<h1 id="Pjax"><a href="#Pjax" class="headerlink" title="Pjax"></a>Pjax</h1><p><a href="https://travis-ci.org/MoOx/pjax"><img src="./img.shields.io/travis/MoOx/pjax.svg" alt="Build Status"></a>.</p>
 <blockquote>
 <p>Easily enable fast AJAX navigation on any website (using pushState() + XHR)</p>
 </blockquote>
@@ -53,11 +53,9 @@ $ git pull
 </code></pre>
 <p><strong>Note</strong>: If you use this option, you will need to do one of the following:</p>
 <ul>
-<li>Link a script tag to either <code>pjax.js</code> or <code>pjax.min.js</code>. E.g.:</li>
-</ul>
-<pre><code class="html">&lt;script src=&quot;./node_modules/pjax/pjax.js&quot;&gt;&lt;/script&gt;
+<li>Link a script tag to either <code>pjax.js</code> or <code>pjax.min.js</code>. E.g.:<pre><code class="html">&lt;script src=&quot;./node_modules/pjax/pjax.js&quot;&gt;&lt;/script&gt;
 </code></pre>
-<ul>
+</li>
 <li>Use a bundler like Webpack. (<code>index.js</code> cannot be used in the browser without a bundler).</li>
 </ul>
 </li>
@@ -163,7 +161,7 @@ npm run build
 <li>No jQuery dependency.</li>
 <li>Not limited to a container.</li>
 <li>No server-side requirements.</li>
-<li>Works for CommonJS environment (Webpack&#x2F;Browserify), AMD (RequireJS) or even globally.</li>
+<li>Works for CommonJS environment (Webpack/Browserify), AMD (RequireJS) or even globally.</li>
 <li>Allows page transitions with CSS animations.</li>
 <li>Can be easily tweaked, since every method is public (and as a result, overridable).</li>
 </ul>
@@ -336,7 +334,7 @@ var pjax = new Pjax({
   }
 })
 </code></pre>
-<p><em>Note that <code>remove</code> includes <code>Animated--reverse</code> which is a simple way to not have to have a duplicate transition (slideIn + reverse &#x3D;&gt; slideOut).</em></p>
+<p><em>Note that <code>remove</code> includes <code>Animated--reverse</code> which is a simple way to not have to have a duplicate transition (slideIn + reverse =&gt; slideOut).</em></p>
 <p>Here is some css that works well with the above configuration:</p>
 <pre><code class="css">/*
   Note: If your content elements don&#39;t have a fixed width it can cause
