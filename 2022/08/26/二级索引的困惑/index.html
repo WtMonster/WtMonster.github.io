@@ -28,7 +28,7 @@
 <meta property="og:description" content="记录一个今年春招至今也没解决的疑问">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-08-26T10:08:40.000Z">
-<meta property="article:modified_time" content="2022-08-26T14:09:25.494Z">
+<meta property="article:modified_time" content="2022-08-26T15:45:25.625Z">
 <meta property="article:author" content="WtMonster">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="索引">
@@ -214,7 +214,7 @@
               <span class="post-meta-item-text">Posted on</span>
               
 
-              <time title="Created: 2022-08-26 18:08:40 / Modified: 22:09:25" itemprop="dateCreated datePublished" datetime="2022-08-26T18:08:40+08:00">2022-08-26</time>
+              <time title="Created: 2022-08-26 18:08:40 / Modified: 23:45:25" itemprop="dateCreated datePublished" datetime="2022-08-26T18:08:40+08:00">2022-08-26</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -271,7 +271,16 @@
 </ol>
 <p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
 <p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
-<p>目前笔者没有想出合理的原因，如果有大佬知道麻烦联系笔者告知。</p>
+<p><strong>在此贴一下公众号「一树一溪」大佬提供的思路</strong></p>
+<blockquote>
+<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
+</blockquote>
+<ol>
+<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
+<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题</li>
+<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间</li>
+</ol>
+<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
 
     </div>
 
