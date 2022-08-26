@@ -28,10 +28,11 @@
 <meta property="og:description" content="近期看到这样一个问题：走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-08-25T13:47:18.000Z">
-<meta property="article:modified_time" content="2022-08-25T14:43:09.979Z">
+<meta property="article:modified_time" content="2022-08-26T14:12:27.915Z">
 <meta property="article:author" content="WtMonster">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="MVCC">
+<meta property="article:tag" content="索引">
 <meta name="twitter:card" content="summary">
 
 <link rel="canonical" href="https://github.com/WtMonster/WtMonster.github.io.git/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/">
@@ -212,10 +213,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2022-08-25 21:47:18 / Modified: 22:43:09" itemprop="dateCreated datePublished" datetime="2022-08-25T21:47:18+08:00">2022-08-25</time>
+              <time title="Created: 2022-08-25 21:47:18" itemprop="dateCreated datePublished" datetime="2022-08-25T21:47:18+08:00">2022-08-25</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-08-26 22:12:27" itemprop="dateModified" datetime="2022-08-26T22:12:27+08:00">2022-08-26</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -275,6 +282,7 @@
           <div class="post-tags">
               <a href="/tags/MySQL/" rel="tag"># MySQL</a>
               <a href="/tags/MVCC/" rel="tag"># MVCC</a>
+              <a href="/tags/%E7%B4%A2%E5%BC%95/" rel="tag"># 索引</a>
           </div>
 
         

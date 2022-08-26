@@ -1,6 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>MVCC与覆盖索引</title>
+    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
+    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
+<span id="more"></span>
+
+<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
+<p>参考资料</p>
+<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
+<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
+<p>《Innodb存储引擎》</p>
+</blockquote>
+<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
+<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
+<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
+<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
+<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
+<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
+<p><strong>所以</strong></p>
+<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
+<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<p>所以覆盖索引不是总不需要回表的。</p>
+<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
+<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
+<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
+<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
+<p>个人认为这是一种效率与空间之间的权衡。</p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+        <tag>MVCC</tag>
+        <tag>索引</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>一个关于二级索引的困惑</title>
     <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
     <content><![CDATA[<p>记录一个今年春招至今也没解决的疑问</p>
@@ -42,45 +82,6 @@
       <tags>
         <tag>MySQL</tag>
         <tag>索引</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>MVCC与覆盖索引</title>
-    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
-    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
-<span id="more"></span>
-
-<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
-<p>参考资料</p>
-<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
-<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
-<p>《Innodb存储引擎》</p>
-</blockquote>
-<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
-<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
-<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
-<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
-<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
-<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
-<p><strong>所以</strong></p>
-<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
-<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<p>所以覆盖索引不是总不需要回表的。</p>
-<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
-<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
-<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
-<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
-<p>个人认为这是一种效率与空间之间的权衡。</p>
-</li>
-</ul>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-        <tag>MVCC</tag>
       </tags>
   </entry>
   <entry>
