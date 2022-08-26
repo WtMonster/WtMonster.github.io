@@ -1,55 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>一个关于二级索引的困惑</title>
-    <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
-    <content><![CDATA[<p>记录一个今年春招至今也没解决的疑问</p>
+    <title>MVCC与覆盖索引</title>
+    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
+    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
 <span id="more"></span>
 
-<blockquote>
-<p>以下讨论范围是以B+树为数据结构的索引</p>
-<p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
+<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
+<p>参考资料</p>
+<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
+<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
+<p>《Innodb存储引擎》</p>
 </blockquote>
-<p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p>
-<p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p>
-<p><strong>接下来我们只考虑除主键列外的其他列</strong></p>
-<p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p>
-<p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p>
-<p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p>
-<p><strong>那么考虑下面这种情况</strong></p>
-<p>有一个表 t_bl 有以下字段 (id,a,b）</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure>
-
-<p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p>
-<p>那么有以下两种索引建立方案</p>
-<ol>
-<li><p><strong>建立 a 字段的索引</strong></p>
-<p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p>
-<p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p>
+<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
+<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
+<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
+<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
+<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
+<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
+<p><strong>所以</strong></p>
+<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
+<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<p>所以覆盖索引不是总不需要回表的。</p>
+<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
+<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
+<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
+<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
+<p>个人认为这是一种效率与空间之间的权衡。</p>
 </li>
-<li><p><strong>建立 a,b 字段的联合索引</strong></p>
-<p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p>
-</li>
-</ol>
-<p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
-<p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
-<p><strong>在此贴一下公众号「一树一溪」大佬提供的思路</strong></p>
-<blockquote>
-<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
-</blockquote>
-<ol>
-<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
-<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题</li>
-<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间</li>
-</ol>
-<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
+</ul>
 ]]></content>
       <categories>
         <category>MySQL</category>
-        <category>疑问</category>
       </categories>
       <tags>
         <tag>MySQL</tag>
+        <tag>MVCC</tag>
         <tag>索引</tag>
       </tags>
   </entry>
@@ -278,43 +265,56 @@
       </tags>
   </entry>
   <entry>
-    <title>MVCC与覆盖索引</title>
-    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
-    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
+    <title>一个关于二级索引的困惑</title>
+    <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
+    <content><![CDATA[<p>记录一个今年春招至今也没解决的疑问</p>
 <span id="more"></span>
 
-<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
-<p>参考资料</p>
-<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
-<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
-<p>《Innodb存储引擎》</p>
+<blockquote>
+<p>以下讨论范围是以B+树为数据结构的索引</p>
+<p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
 </blockquote>
-<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
-<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
-<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
-<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
-<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
-<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
-<p><strong>所以</strong></p>
-<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
-<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<p>所以覆盖索引不是总不需要回表的。</p>
-<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
-<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
-<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
-<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
-<p>个人认为这是一种效率与空间之间的权衡。</p>
+<p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p>
+<p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p>
+<p><strong>接下来我们只考虑除主键列外的其他列</strong></p>
+<p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p>
+<p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p>
+<p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p>
+<p><strong>那么考虑下面这种情况</strong></p>
+<p>有一个表 t_bl 有以下字段 (id,a,b）</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure>
+
+<p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p>
+<p>那么有以下两种索引建立方案</p>
+<ol>
+<li><p><strong>建立 a 字段的索引</strong></p>
+<p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p>
+<p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p>
 </li>
-</ul>
+<li><p><strong>建立 a,b 字段的联合索引</strong></p>
+<p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p>
+</li>
+</ol>
+<p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
+<p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
+<p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
+<blockquote>
+<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
+</blockquote>
+<ol>
+<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
+<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题</li>
+<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间</li>
+</ol>
+<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
 ]]></content>
       <categories>
         <category>MySQL</category>
+        <category>疑问</category>
       </categories>
       <tags>
         <tag>MySQL</tag>
         <tag>索引</tag>
-        <tag>MVCC</tag>
       </tags>
   </entry>
 </search>
