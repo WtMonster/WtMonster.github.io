@@ -6,7 +6,7 @@
   <link href="https://github.com/WtMonster/WtMonster.github.io.git/atom.xml" rel="self"/>
   
   <link href="https://github.com/WtMonster/WtMonster.github.io.git/"/>
-  <updated>2022-08-26T14:04:52.050Z</updated>
+  <updated>2022-08-26T14:09:25.494Z</updated>
   <id>https://github.com/WtMonster/WtMonster.github.io.git/</id>
   
   <author>
@@ -17,16 +17,16 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
-    <title>二级索引的困惑</title>
+    <title>一个关于二级索引的困惑</title>
     <link href="https://github.com/WtMonster/WtMonster.github.io.git/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/"/>
     <id>https://github.com/WtMonster/WtMonster.github.io.git/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</id>
     <published>2022-08-26T10:08:40.000Z</published>
-    <updated>2022-08-26T14:04:52.050Z</updated>
+    <updated>2022-08-26T14:09:25.494Z</updated>
     
-    <content type="html"><![CDATA[<p>记录一下今年春招关于二级索引一直以来的一个疑问（<strong>未解决</strong>）</p><span id="more"></span><blockquote><p>以下讨论范围是以B+树为数据结构的索引</p><p>并且不考虑二级索引关于事务版本的的字段可见性问题</p></blockquote><p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p><p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p><p><strong>接下来我们只考虑除主键列外的其他列</strong></p><p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p><p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p><p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p><p><strong>那么考虑下面这种情况</strong></p><p>有一个表 t_bl 有以下字段 (id,a,b）</p><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure><p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p><p>那么有以下两种索引建立方案</p><ol><li><p><strong>建立 a 字段的索引</strong></p><p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p><p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p></li><li><p><strong>建立 a,b 字段的联合索引</strong></p><p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p></li></ol><p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p><p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p><p>目前笔者没有想出合理的原因，如果有大佬知道麻烦联系笔者告知。</p>]]></content>
+    <content type="html"><![CDATA[<p>记录一个今年春招至今也没解决的疑问</p><span id="more"></span><blockquote><p>以下讨论范围是以B+树为数据结构的索引</p><p>并且不考虑二级索引关于事务版本的的字段可见性问题</p></blockquote><p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p><p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p><p><strong>接下来我们只考虑除主键列外的其他列</strong></p><p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p><p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p><p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p><p><strong>那么考虑下面这种情况</strong></p><p>有一个表 t_bl 有以下字段 (id,a,b）</p><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure><p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p><p>那么有以下两种索引建立方案</p><ol><li><p><strong>建立 a 字段的索引</strong></p><p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p><p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p></li><li><p><strong>建立 a,b 字段的联合索引</strong></p><p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p></li></ol><p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p><p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p><p>目前笔者没有想出合理的原因，如果有大佬知道麻烦联系笔者告知。</p>]]></content>
     
     
-    <summary type="html">&lt;p&gt;记录一下今年春招关于二级索引一直以来的一个疑问（&lt;strong&gt;未解决&lt;/strong&gt;）&lt;/p&gt;</summary>
+    <summary type="html">&lt;p&gt;记录一个今年春招至今也没解决的疑问&lt;/p&gt;</summary>
     
     
     
