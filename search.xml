@@ -43,6 +43,10 @@
 <li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li>
 <li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li>
 </ol>
+<p><strong>根据Bill Karwin（《SQL反模式》作者）的</strong></p>
+<p>目前Microsoft SQL Server已经实现了这个功能</p>
+<p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p>
+<p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p>
 <p><strong>如果有其他思路，欢迎评论交流！</strong></p>
 ]]></content>
       <categories>
