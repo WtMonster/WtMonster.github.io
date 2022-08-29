@@ -28,7 +28,7 @@
 <meta property="og:description" content="记录一个今年春招至今也没解决的疑问">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-08-26T10:08:40.000Z">
-<meta property="article:modified_time" content="2022-08-29T06:35:18.034Z">
+<meta property="article:modified_time" content="2022-08-29T06:50:07.122Z">
 <meta property="article:author" content="WtMonster">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="索引">
@@ -220,7 +220,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-08-29 14:35:18" itemprop="dateModified" datetime="2022-08-29T14:35:18+08:00">2022-08-29</time>
+                <time title="Modified: 2022-08-29 14:50:07" itemprop="dateModified" datetime="2022-08-29T14:50:07+08:00">2022-08-29</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -287,7 +287,7 @@
 <li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li>
 <li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li>
 </ol>
-<p><strong>根据Bill Karwin（《SQL反模式》作者）的</strong></p>
+<p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p>
 <p>目前Microsoft SQL Server已经实现了这个功能</p>
 <p><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p>
 <p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p>
