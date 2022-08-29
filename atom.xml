@@ -60,9 +60,9 @@
     
     <category term="MySQL" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/MySQL/"/>
     
-    <category term="索引" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/%E7%B4%A2%E5%BC%95/"/>
-    
     <category term="MVCC" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/MVCC/"/>
+    
+    <category term="索引" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/%E7%B4%A2%E5%BC%95/"/>
     
   </entry>
   
