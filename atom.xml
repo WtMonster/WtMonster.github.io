@@ -6,7 +6,7 @@
   <link href="https://github.com/WtMonster/WtMonster.github.io.git/atom.xml" rel="self"/>
   
   <link href="https://github.com/WtMonster/WtMonster.github.io.git/"/>
-  <updated>2022-08-29T06:56:01.805Z</updated>
+  <updated>2022-08-30T03:40:27.065Z</updated>
   <id>https://github.com/WtMonster/WtMonster.github.io.git/</id>
   
   <author>
@@ -17,16 +17,16 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
-    <title>一个关于二级索引的困惑</title>
+    <title>一个关于二级索引的优化思路</title>
     <link href="https://github.com/WtMonster/WtMonster.github.io.git/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/"/>
     <id>https://github.com/WtMonster/WtMonster.github.io.git/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</id>
     <published>2022-08-26T10:08:40.000Z</published>
-    <updated>2022-08-29T06:56:01.805Z</updated>
+    <updated>2022-08-30T03:40:27.065Z</updated>
     
-    <content type="html"><![CDATA[<p>记录一个今年春招至今也没解决的疑问（目前解决啦！感谢大佬们的解答和肯定！）</p><span id="more"></span><blockquote><p>以下讨论范围是以B+树为数据结构的索引</p><p>并且不考虑二级索引关于事务版本的的字段可见性问题</p></blockquote><p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p><p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p><p><strong>接下来我们只考虑除主键列外的其他列</strong></p><p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p><p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p><p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p><p><strong>那么考虑下面这种情况</strong></p><p>有一个表 t_bl 有以下字段 (id,a,b）</p><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure><p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p><p>那么有以下两种索引建立方案</p><ol><li><p><strong>建立 a 字段的索引</strong></p><p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p><p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p></li><li><p><strong>建立 a,b 字段的联合索引</strong></p><p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p><p><strong>缺点</strong>：使得二级索引中的每个非节点都增加了存储 b 字段的不必要的空间开销（因为b字段并不是检索依据）。</p></li></ol><p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p><p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p><blockquote><p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p></blockquote><ol><li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li><li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li><li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li></ol><p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p><p>目前Microsoft SQL Server已经实现了这个功能</p><p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p><p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p><p><strong>如果有其他思路，欢迎评论交流！</strong></p>]]></content>
+    <content type="html"><![CDATA[<p>一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）</p><span id="more"></span><blockquote><p>以下讨论范围是以B+树为数据结构的索引</p><p>并且不考虑二级索引关于事务版本的的字段可见性问题</p></blockquote><p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p><p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p><p><strong>接下来我们只考虑除主键列外的其他列</strong></p><p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p><p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p><p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p><p><strong>那么考虑下面这种情况</strong></p><p>有一个表 t_bl 有以下字段 (id,a,b）</p><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure><p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p><p>那么有以下两种索引建立方案</p><ol><li><p><strong>建立 a 字段的索引</strong></p><p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p><p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p></li><li><p><strong>建立 a,b 字段的联合索引</strong></p><p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p><p><strong>缺点</strong>：使得二级索引中的每个非节点都增加了存储 b 字段的不必要的空间开销（因为b字段并不是检索依据）。</p></li></ol><p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p><p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p><blockquote><p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p></blockquote><ol><li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li><li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li><li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li></ol><p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p><p>目前<strong>Microsoft SQL Server</strong>已经实现了这个功能</p><p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p><p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p><p><strong>如果有其他思路，欢迎评论交流！</strong></p>]]></content>
     
     
-    <summary type="html">&lt;p&gt;记录一个今年春招至今也没解决的疑问（目前解决啦！感谢大佬们的解答和肯定！）&lt;/p&gt;</summary>
+    <summary type="html">&lt;p&gt;一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）&lt;/p&gt;</summary>
     
     
     
@@ -60,9 +60,9 @@
     
     <category term="MySQL" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/MySQL/"/>
     
-    <category term="MVCC" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/MVCC/"/>
-    
     <category term="索引" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/%E7%B4%A2%E5%BC%95/"/>
+    
+    <category term="MVCC" scheme="https://github.com/WtMonster/WtMonster.github.io.git/tags/MVCC/"/>
     
   </entry>
   
