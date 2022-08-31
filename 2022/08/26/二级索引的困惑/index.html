@@ -28,7 +28,7 @@
 <meta property="og:description" content="一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-08-26T10:08:40.000Z">
-<meta property="article:modified_time" content="2022-08-30T03:40:27.065Z">
+<meta property="article:modified_time" content="2022-08-31T05:58:05.007Z">
 <meta property="article:author" content="WtMonster">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="索引">
@@ -220,7 +220,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-08-30 11:40:27" itemprop="dateModified" datetime="2022-08-30T11:40:27+08:00">2022-08-30</time>
+                <time title="Modified: 2022-08-31 13:58:05" itemprop="dateModified" datetime="2022-08-31T13:58:05+08:00">2022-08-31</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -250,7 +250,7 @@
         <p>一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）</p>
 <span id="more"></span>
 
-<blockquote>
+<h2 id="开端"><a href="#开端" class="headerlink" title="开端"></a>开端</h2><blockquote>
 <p>以下讨论范围是以B+树为数据结构的索引</p>
 <p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
 </blockquote>
@@ -278,7 +278,10 @@
 </ol>
 <p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
 <p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
-<p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a><strong>思考</strong></h2><p>innodb B+树索引页面大小默认是16kb，索引单位越小扇出越大。</p>
+<p>一个三层，扇出为100的 B+ 树，按照页面为单位，第三层假设10000个页，那么第二层就是100个页，第一层为1个页。</p>
+<p><strong>因此实际上叶子节点才是索引结构的主要空间开销，导致这个优化的收益并不是很高。</strong></p>
+<h2 id="大佬提供的思路"><a href="#大佬提供的思路" class="headerlink" title="大佬提供的思路"></a>大佬提供的思路</h2><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
 <blockquote>
 <p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
 </blockquote>
@@ -374,6 +377,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E7%AB%AF"><span class="nav-number">1.</span> <span class="nav-text">开端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%9D%E8%80%83"><span class="nav-number">2.</span> <span class="nav-text">思考</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A4%A7%E4%BD%AC%E6%8F%90%E4%BE%9B%E7%9A%84%E6%80%9D%E8%B7%AF"><span class="nav-number">3.</span> <span class="nav-text">大佬提供的思路</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
