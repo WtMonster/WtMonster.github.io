@@ -321,8 +321,8 @@
       </categories>
       <tags>
         <tag>MySQL</tag>
-        <tag>索引</tag>
         <tag>MVCC</tag>
+        <tag>索引</tag>
       </tags>
   </entry>
   <entry>
@@ -353,7 +353,9 @@
 <blockquote>
 <p>ThreadLocalMap使用闭散列:(开放地址法或者也叫线性探测法)解决哈希冲突，线性探测法的地址增量di = 1, 2, … 其中，i为探测次数。该方法一次探测下一个地址，直到有空的地址后插入，若整个空间都找不到空余的地址，则产生溢出。假设当前table长度为16，也就是说如果计算出来key的hash值为14，如果table[14]上已经有值，并且其key与当前key不一致，那么就发生了hash冲突，这个时候将14加1得到15，取table[15]进行判断，这个时候如果还是冲突会回到0，取table[0],以此类推，直到可以插入。<br>按照上面的描述，可以把table看成一个环形数组。</p>
 </blockquote>
-<h4 id="对比FastThreadLocal"><a href="#对比FastThreadLocal" class="headerlink" title="对比FastThreadLocal"></a>对比FastThreadLocal</h4><p>。。。待补充</p>
+<h4 id="对比FastThreadLocal"><a href="#对比FastThreadLocal" class="headerlink" title="对比FastThreadLocal"></a>对比FastThreadLocal</h4><p>其实就是FastThreadLocal使用index直接记录元素下标，避免了hash计算，提高了效率。</p>
+<p><strong>疑惑</strong></p>
+<p>- </p>
 <h4 id="补充与思考"><a href="#补充与思考" class="headerlink" title="补充与思考"></a>补充与思考</h4><p><strong>ThreadLocal为了防止内存泄露所做的</strong></p>
 <ol>
 <li><p>ThreadLocal通过弱引用使得reference，也就是ThreadLocal这个key可以被回收（在只有这个弱引用关系时）</p>
@@ -368,6 +370,9 @@
 </ol>
 <p><strong>巧妙之处</strong></p>
 <p>弱引用对ThreadLocal的设计上造成了一定的问题，<strong>主要体现在</strong>key被回收了而value依然存在，entry不为null。</p>
+<blockquote>
+<p>为什么不能value也设置成弱引用的原因是因为value只被entry引用，会导致误回收</p>
+</blockquote>
 <p>但如果<strong>结合ThreadLocal解决哈希冲突的策略</strong>（开放定址法）来看这一设计就变得比较合理了。</p>
 <p>ThreadLocal使用开放定址法解决哈希冲突，如果当前slot已经在使用，那么需要增加下标值继续向后探测，而正是因为value并没有被回收，所以开放定址法能作为一个有效的策略。</p>
 <blockquote>
