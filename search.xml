@@ -331,6 +331,8 @@
     <content><![CDATA[<h3 id="ThreadLocal"><a href="#ThreadLocal" class="headerlink" title="ThreadLocal"></a>ThreadLocal</h3><p>Thread有成员变量ThreadLocalMap对象（threadlocals）</p>
 <p>ThreadLocal有内部类ThreadLocalMap用于存放线程数据</p>
 <p>ThreadLocalMap底层通过Entry数组保存数据</p>
+<span id="more"></span>
+
 <p>所以其实是每个线程都有一份自己的ThreadLocalMap用于存放所有的entry，独立管理，每个threadlocals都是直接放在线程本身内部当做成员变量的，而每个new出来的threadlocal则是与值封装成Entry，类似key的功能。</p>
 <p>Entry继承了弱引用的ThreadLocal，设置时会将ThreadLocal设置进去，当做key</p>
 <blockquote>
@@ -355,7 +357,9 @@
 </blockquote>
 <h4 id="对比FastThreadLocal"><a href="#对比FastThreadLocal" class="headerlink" title="对比FastThreadLocal"></a>对比FastThreadLocal</h4><p>其实就是FastThreadLocal使用index直接记录元素下标，避免了hash计算，提高了效率。</p>
 <p><strong>疑惑</strong></p>
-<p>- </p>
+<ul>
+<li>为什么NextIndex是static的</li>
+</ul>
 <h4 id="补充与思考"><a href="#补充与思考" class="headerlink" title="补充与思考"></a>补充与思考</h4><p><strong>ThreadLocal为了防止内存泄露所做的</strong></p>
 <ol>
 <li><p>ThreadLocal通过弱引用使得reference，也就是ThreadLocal这个key可以被回收（在只有这个弱引用关系时）</p>
