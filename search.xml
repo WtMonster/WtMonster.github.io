@@ -1,187 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>MVCC与覆盖索引</title>
-    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
-    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
-<span id="more"></span>
-
-<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
-<p>参考资料</p>
-<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
-<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
-<p>《Innodb存储引擎》</p>
-</blockquote>
-<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
-<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
-<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
-<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
-<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
-<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
-<p><strong>所以</strong></p>
-<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
-<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<p>所以覆盖索引不是总不需要回表的。</p>
-<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
-<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
-<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
-<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
-<p>个人认为这是一种效率与空间之间的权衡。</p>
-</li>
-</ul>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-        <tag>MVCC</tag>
-        <tag>索引</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>一个关于二级索引的优化思路</title>
-    <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
-    <content><![CDATA[<p>一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）</p>
-<span id="more"></span>
-
-<h2 id="开端"><a href="#开端" class="headerlink" title="开端"></a>开端</h2><blockquote>
-<p>以下讨论范围是以B+树为数据结构的索引</p>
-<p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
-</blockquote>
-<p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p>
-<p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p>
-<p><strong>接下来我们只考虑除主键列外的其他列</strong></p>
-<p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p>
-<p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p>
-<p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p>
-<p><strong>那么考虑下面这种情况</strong></p>
-<p>有一个表 t_bl 有以下字段 (id,a,b）</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure>
-
-<p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p>
-<p>那么有以下两种索引建立方案</p>
-<ol>
-<li><p><strong>建立 a 字段的索引</strong></p>
-<p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p>
-<p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p>
-</li>
-<li><p><strong>建立 a,b 字段的联合索引</strong></p>
-<p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p>
-<p><strong>缺点</strong>：使得二级索引中的每个非节点都增加了存储 b 字段的不必要的空间开销（因为b字段并不是检索依据）。</p>
-</li>
-</ol>
-<p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
-<p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a><strong>思考</strong></h2><p>innodb B+树索引页面大小默认是16kb，索引单位越小扇出越大。</p>
-<p>一个三层，扇出为100的 B+ 树，按照页面为单位，第三层假设10000个页，那么第二层就是100个页，第一层为1个页。</p>
-<p><strong>因此实际上叶子节点才是索引结构的主要空间开销，导致这个优化的收益并不是很高。</strong></p>
-<h2 id="大佬提供的思路"><a href="#大佬提供的思路" class="headerlink" title="大佬提供的思路"></a>大佬提供的思路</h2><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
-<blockquote>
-<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
-</blockquote>
-<ol>
-<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
-<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li>
-<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li>
-</ol>
-<p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p>
-<p>目前<strong>Microsoft SQL Server</strong>已经实现了这个功能</p>
-<p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p>
-<p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p>
-<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-        <category>疑问</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-        <tag>索引</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>ThreadLocal</title>
-    <url>/2022/09/12/ThreadLocal/</url>
-    <content><![CDATA[<h3 id="ThreadLocal"><a href="#ThreadLocal" class="headerlink" title="ThreadLocal"></a>ThreadLocal</h3><p>Thread有成员变量ThreadLocalMap对象（threadlocals）</p>
-<p>ThreadLocal有内部类ThreadLocalMap用于存放线程数据</p>
-<p>ThreadLocalMap底层通过Entry数组保存数据</p>
-<span id="more"></span>
-
-<p>所以其实是每个线程都有一份自己的ThreadLocalMap用于存放所有的entry，独立管理，每个threadlocals都是直接放在线程本身内部当做成员变量的，而每个new出来的threadlocal则是与值封装成Entry，类似key的功能。</p>
-<p>Entry继承了弱引用的ThreadLocal，设置时会将ThreadLocal设置进去，当做key</p>
-<blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">tab[i] = new Entry(key, value);</span><br></pre></td></tr></table></figure>
-</blockquote>
-<p><img src="image-20220401210612680.png" alt="image-20220401210612680"></p>
-<p><strong>为什么是弱引用？</strong></p>
-<p>一旦发现了<strong>只具有</strong>弱引用的对象，不管当前内存空间足够与否，都会回收它的内存。</p>
-<p>所以避免了key的内存泄露，但value还是需要手动使用set或remove回收</p>
-<p>一个线程可以有多份数据存储，通过不同的threadlocal对象来获取</p>
-<p><img src="image-20220401215400663.png" alt="image-20220401215400663"></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * The difference between successively generated hash codes - turns</span></span><br><span class="line"><span class="comment"> * implicit sequential thread-local IDs into near-optimally spread</span></span><br><span class="line"><span class="comment"> * multiplicative hash values for power-of-two-sized tables.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="variable">HASH_INCREMENT</span> <span class="operator">=</span> <span class="number">0x61c88647</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Returns the next hash code.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="type">int</span> <span class="title function_">nextHashCode</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> nextHashCode.getAndAdd(HASH_INCREMENT);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>底层通过AtomicInteger维护一个静态成员变量实现ThreadLocal的哈希值生成</p>
-<p>AutomicInteger可以保证多线程情况下创建threadLocal得到的hash值必定不同，避免了equals不同而hash值相同的情况。</p>
-<blockquote>
-<p>每当创建一个<code>ThreadLocal</code>对象，这个<code>ThreadLocal.nextHashCode</code> 这个值就会增长 <code>0x61c88647</code> 。</p>
-<p>这个值很特殊，它是<strong>斐波那契数</strong> 也叫 <strong>黄金分割数</strong>。<code>hash</code>增量为 这个数字，带来的好处就是 <code>hash</code> <strong>分布非常均匀</strong>。</p>
-</blockquote>
-<blockquote>
-<p>ThreadLocalMap使用闭散列:(开放地址法或者也叫线性探测法)解决哈希冲突，线性探测法的地址增量di = 1, 2, … 其中，i为探测次数。该方法一次探测下一个地址，直到有空的地址后插入，若整个空间都找不到空余的地址，则产生溢出。假设当前table长度为16，也就是说如果计算出来key的hash值为14，如果table[14]上已经有值，并且其key与当前key不一致，那么就发生了hash冲突，这个时候将14加1得到15，取table[15]进行判断，这个时候如果还是冲突会回到0，取table[0],以此类推，直到可以插入。<br>按照上面的描述，可以把table看成一个环形数组。</p>
-</blockquote>
-<h4 id="对比FastThreadLocal"><a href="#对比FastThreadLocal" class="headerlink" title="对比FastThreadLocal"></a>对比FastThreadLocal</h4><p>其实就是FastThreadLocal使用index直接记录元素下标，避免了hash计算，提高了效率。</p>
-<p><strong>疑惑</strong></p>
-<ul>
-<li>为什么NextIndex是static的</li>
-</ul>
-<h4 id="补充与思考"><a href="#补充与思考" class="headerlink" title="补充与思考"></a>补充与思考</h4><p><strong>ThreadLocal为了防止内存泄露所做的</strong></p>
-<ol>
-<li><p>ThreadLocal通过弱引用使得reference，也就是ThreadLocal这个key可以被回收（在只有这个弱引用关系时）</p>
-</li>
-<li><p>如果set的是一个全新为null的slot，而非被回收了弱引用的，也非正常使用的entry，那么set时会顺带进行一次启发式清理，这个清理是从当前下标开始清理log2(n)<strong>次</strong>（n是当前size，也就是元素数量）</p>
-<blockquote>
-<p>值得注意的</p>
-<p>这里的清理是按次数来算的，每次清理都会以遇到空slot为止，并且会对清理过程中的有效entry重新hash</p>
-<p>这里修改了<em>Knuth</em>高德纳的著作TAOCP（《计算机程序设计艺术》）的<em>6.4</em>章节（散列) 中的<em>R</em>算法</p>
-</blockquote>
-</li>
-</ol>
-<p><strong>巧妙之处</strong></p>
-<p>弱引用对ThreadLocal的设计上造成了一定的问题，<strong>主要体现在</strong>key被回收了而value依然存在，entry不为null。</p>
-<blockquote>
-<p>为什么不能value也设置成弱引用的原因是因为value只被entry引用，会导致误回收</p>
-</blockquote>
-<p>但如果<strong>结合ThreadLocal解决哈希冲突的策略</strong>（开放定址法）来看这一设计就变得比较合理了。</p>
-<p>ThreadLocal使用开放定址法解决哈希冲突，如果当前slot已经在使用，那么需要增加下标值继续向后探测，而正是因为value并没有被回收，所以开放定址法能作为一个有效的策略。</p>
-<blockquote>
-<p>如果整个entry都能直接被回收</p>
-<p>考虑这种情况</p>
-<p>以下entry都是同一哈希值，通过开放定址法集聚在一起</p>
-<p>entry0 entry1 entry2 entry3 entry4</p>
-<p>直接将部分entry回收</p>
-<p>null null entry2 entry3 entry4</p>
-<p>那么就无法通过哈希函数有效查找到后面三个entry了</p>
-</blockquote>
-<p>所以实际上value的保留相当于打上了一个标记，为之后的查找和重哈希提供了遍历。</p>
-<h5 id="关于解决哈希冲突方案的选择"><a href="#关于解决哈希冲突方案的选择" class="headerlink" title="关于解决哈希冲突方案的选择"></a>关于解决哈希冲突方案的选择</h5><p>HashMap使用拉链法和红黑树，redis使用拉链法，而ThreadLocal使用开放定址法</p>
-<p>除了网上都在说的红黑树更复杂，拉链法又比开放定址法复杂，以及指针带来的空间开销外</p>
-<p>个人感觉一个重要的原因<strong>是哈希函数的限制</strong></p>
-<p>对于HashMap，<strong>无法确定用户会给出一个怎样的hash函数</strong>，所以需要尽可能考虑到所有的情况，需要有兜底的策略。</p>
-<p>而对于redis来说，数据结构的数量和种类是固定的，<strong>哈希函数都经过精心设计</strong>，所以通过拉链法就够用了。</p>
-<p>而对于ThreadLocal来说，<strong>哈希函数直接通过黄金分割数配合长度为2的幂的数组来使用</strong>，极大降低了哈希冲突的可能性，所以可以直接使用开放定址法即可。</p>
-]]></content>
-      <categories>
-        <category>Java</category>
-        <category>Netty</category>
-      </categories>
-      <tags>
-        <tag>ThreadLocal</tag>
-        <tag>FastThreadLocal</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>常量池详解</title>
     <url>/2022/06/25/%E5%B8%B8%E9%87%8F%E6%B1%A0%E8%AF%A6%E8%A7%A3/</url>
     <content><![CDATA[<h2 id="关于常量池"><a href="#关于常量池" class="headerlink" title="关于常量池"></a>关于常量池</h2><h3 id="常量池-Class常量池（Constant-pool）"><a href="#常量池-Class常量池（Constant-pool）" class="headerlink" title="常量池/Class常量池（Constant pool）"></a>常量池/Class常量池（Constant pool）</h3><p>常量池,也叫 Class 常量池(常量池 == Class常量池)。Java文件被编译成 Class文件，Class文件中除了包含类的版本、字段、方法、接口等描述信息外，还有一项就是常量池，常量池是当Class文件被Java虚拟机加载进来后存放在方法区 各种字面量 (Literal)和 符号引用 。</p>
@@ -403,6 +222,188 @@
         <tag>常量池</tag>
         <tag>JVM</tag>
         <tag>HotSpot</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>一个关于二级索引的优化思路</title>
+    <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
+    <content><![CDATA[<p>一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）</p>
+<span id="more"></span>
+
+<h2 id="开端"><a href="#开端" class="headerlink" title="开端"></a>开端</h2><blockquote>
+<p>以下讨论范围是以B+树为数据结构的索引</p>
+<p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
+</blockquote>
+<p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p>
+<p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p>
+<p><strong>接下来我们只考虑除主键列外的其他列</strong></p>
+<p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p>
+<p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p>
+<p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p>
+<p><strong>那么考虑下面这种情况</strong></p>
+<p>有一个表 t_bl 有以下字段 (id,a,b）</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure>
+
+<p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p>
+<p>那么有以下两种索引建立方案</p>
+<ol>
+<li><p><strong>建立 a 字段的索引</strong></p>
+<p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p>
+<p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p>
+</li>
+<li><p><strong>建立 a,b 字段的联合索引</strong></p>
+<p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p>
+<p><strong>缺点</strong>：使得二级索引中的每个非节点都增加了存储 b 字段的不必要的空间开销（因为b字段并不是检索依据）。</p>
+</li>
+</ol>
+<p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
+<p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a><strong>思考</strong></h2><p>innodb B+树索引页面大小默认是16kb，索引单位越小扇出越大。</p>
+<p>一个三层，扇出为100的 B+ 树，按照页面为单位，第三层假设10000个页，那么第二层就是100个页，第一层为1个页。</p>
+<p><strong>因此实际上叶子节点才是索引结构的主要空间开销，导致这个优化的收益并不是很高。</strong></p>
+<h2 id="大佬提供的思路"><a href="#大佬提供的思路" class="headerlink" title="大佬提供的思路"></a>大佬提供的思路</h2><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
+<blockquote>
+<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
+</blockquote>
+<ol>
+<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
+<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li>
+<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li>
+</ol>
+<p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p>
+<p>目前<strong>Microsoft SQL Server</strong>已经实现了这个功能</p>
+<p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p>
+<p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p>
+<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+        <category>疑问</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+        <tag>索引</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>MVCC与覆盖索引</title>
+    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
+    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
+<span id="more"></span>
+
+<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
+<p>参考资料</p>
+<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
+<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
+<p>《Innodb存储引擎》</p>
+</blockquote>
+<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
+<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
+<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
+<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
+<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
+<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
+<p><strong>所以</strong></p>
+<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
+<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<p>所以覆盖索引不是总不需要回表的。</p>
+<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
+<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
+<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
+<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
+<p>个人认为这是一种效率与空间之间的权衡。</p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+        <tag>MVCC</tag>
+        <tag>索引</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>ThreadLocal</title>
+    <url>/2022/09/12/ThreadLocal/</url>
+    <content><![CDATA[<h3 id="ThreadLocal"><a href="#ThreadLocal" class="headerlink" title="ThreadLocal"></a>ThreadLocal</h3><p>Thread有成员变量ThreadLocalMap对象（threadlocals）</p>
+<p>ThreadLocal有内部类ThreadLocalMap用于存放线程数据</p>
+<p>ThreadLocalMap底层通过Entry数组保存数据</p>
+<span id="more"></span>
+
+<p>所以其实是每个线程都有一份自己的ThreadLocalMap用于存放所有的entry，独立管理，每个threadlocals都是直接放在线程本身内部当做成员变量的，而每个new出来的threadlocal则是与值封装成Entry，类似key的功能。</p>
+<p>Entry继承了弱引用的ThreadLocal，设置时会将ThreadLocal设置进去，当做key</p>
+<blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">tab[i] = new Entry(key, value);</span><br></pre></td></tr></table></figure>
+</blockquote>
+<p><img src="image-20220401210612680.png" alt="image-20220401210612680"></p>
+<p><strong>为什么是弱引用？</strong></p>
+<p>一旦发现了<strong>只具有</strong>弱引用的对象，不管当前内存空间足够与否，都会回收它的内存。</p>
+<p>所以避免了key的内存泄露，但value还是需要手动使用set或remove回收</p>
+<p>一个线程可以有多份数据存储，通过不同的threadlocal对象来获取</p>
+<p><img src="image-20220401215400663.png" alt="image-20220401215400663"></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * The difference between successively generated hash codes - turns</span></span><br><span class="line"><span class="comment"> * implicit sequential thread-local IDs into near-optimally spread</span></span><br><span class="line"><span class="comment"> * multiplicative hash values for power-of-two-sized tables.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="variable">HASH_INCREMENT</span> <span class="operator">=</span> <span class="number">0x61c88647</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Returns the next hash code.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="type">int</span> <span class="title function_">nextHashCode</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> nextHashCode.getAndAdd(HASH_INCREMENT);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>底层通过AtomicInteger维护一个静态成员变量实现ThreadLocal的哈希值生成</p>
+<p>AutomicInteger可以保证多线程情况下创建threadLocal得到的hash值必定不同，避免了equals不同而hash值相同的情况。</p>
+<blockquote>
+<p>每当创建一个<code>ThreadLocal</code>对象，这个<code>ThreadLocal.nextHashCode</code> 这个值就会增长 <code>0x61c88647</code> 。</p>
+<p>这个值很特殊，它是<strong>斐波那契数</strong> 也叫 <strong>黄金分割数</strong>。<code>hash</code>增量为 这个数字，带来的好处就是 <code>hash</code> <strong>分布非常均匀</strong>。</p>
+</blockquote>
+<blockquote>
+<p>ThreadLocalMap使用闭散列:(开放地址法或者也叫线性探测法)解决哈希冲突，线性探测法的地址增量di = 1, 2, … 其中，i为探测次数。该方法一次探测下一个地址，直到有空的地址后插入，若整个空间都找不到空余的地址，则产生溢出。假设当前table长度为16，也就是说如果计算出来key的hash值为14，如果table[14]上已经有值，并且其key与当前key不一致，那么就发生了hash冲突，这个时候将14加1得到15，取table[15]进行判断，这个时候如果还是冲突会回到0，取table[0],以此类推，直到可以插入。<br>按照上面的描述，可以把table看成一个环形数组。</p>
+</blockquote>
+<h4 id="对比FastThreadLocal"><a href="#对比FastThreadLocal" class="headerlink" title="对比FastThreadLocal"></a>对比FastThreadLocal</h4><p>其实就是FastThreadLocal使用index直接记录元素下标，避免了hash计算，提高了效率。</p>
+<p><strong>疑惑</strong></p>
+<ul>
+<li>为什么NextIndex是static的</li>
+</ul>
+<h4 id="补充与思考"><a href="#补充与思考" class="headerlink" title="补充与思考"></a>补充与思考</h4><p><strong>ThreadLocal为了防止内存泄露所做的</strong></p>
+<ol>
+<li><p>ThreadLocal通过弱引用使得reference，也就是ThreadLocal这个key可以被回收（在只有这个弱引用关系时）</p>
+</li>
+<li><p>如果set的是一个全新为null的slot，而非被回收了弱引用的，也非正常使用的entry，那么set时会顺带进行一次启发式清理，这个清理是从当前下标开始清理log2(n)<strong>次</strong>（n是当前size，也就是元素数量）</p>
+<blockquote>
+<p>值得注意的</p>
+<p>这里的清理是按次数来算的，每次清理都会以遇到空slot为止，并且会对清理过程中的有效entry重新hash</p>
+<p>这里修改了<em>Knuth</em>高德纳的著作TAOCP（《计算机程序设计艺术》）的<em>6.4</em>章节（散列) 中的<em>R</em>算法</p>
+</blockquote>
+</li>
+</ol>
+<p>另外值得注意的是ThreadLocal如果出现线程复用的话可能导致脏数据问题。如果在实现的线程 run（）方法体中不显示地调用 remove 清理与线程相关的 ThreadLocal 对象，并且复用时不调用 set 设置初始值，就可能 get () 到重用的线程信息。</p>
+<p><strong>巧妙之处</strong></p>
+<p>弱引用对ThreadLocal的设计上造成了一定的问题，<strong>主要体现在</strong>key被回收了而value依然存在，entry不为null。</p>
+<blockquote>
+<p>为什么不能value也设置成弱引用的原因是因为value只被entry引用，会导致误回收</p>
+</blockquote>
+<p>但如果<strong>结合ThreadLocal解决哈希冲突的策略</strong>（开放定址法）来看这一设计就变得比较合理了。</p>
+<p>ThreadLocal使用开放定址法解决哈希冲突，如果当前slot已经在使用，那么需要增加下标值继续向后探测，而正是因为value并没有被回收，所以开放定址法能作为一个有效的策略。</p>
+<blockquote>
+<p>如果整个entry都能直接被回收</p>
+<p>考虑这种情况</p>
+<p>以下entry都是同一哈希值，通过开放定址法集聚在一起</p>
+<p>entry0 entry1 entry2 entry3 entry4</p>
+<p>直接将部分entry回收</p>
+<p>null null entry2 entry3 entry4</p>
+<p>那么就无法通过哈希函数有效查找到后面三个entry了</p>
+</blockquote>
+<p>所以实际上value的保留相当于打上了一个标记，为之后的查找和重哈希提供了遍历。</p>
+<h5 id="关于解决哈希冲突方案的选择"><a href="#关于解决哈希冲突方案的选择" class="headerlink" title="关于解决哈希冲突方案的选择"></a>关于解决哈希冲突方案的选择</h5><p>HashMap使用拉链法和红黑树，redis使用拉链法，而ThreadLocal使用开放定址法</p>
+<p>除了网上都在说的红黑树更复杂，拉链法又比开放定址法复杂，以及指针带来的空间开销外</p>
+<p>个人感觉一个重要的原因<strong>是哈希函数的限制</strong></p>
+<p>对于HashMap，<strong>无法确定用户会给出一个怎样的hash函数</strong>，所以需要尽可能考虑到所有的情况，需要有兜底的策略。</p>
+<p>而对于redis来说，数据结构的数量和种类是固定的，<strong>哈希函数都经过精心设计</strong>，所以通过拉链法就够用了。</p>
+<p>而对于ThreadLocal来说，<strong>哈希函数直接通过黄金分割数配合长度为2的幂的数组来使用</strong>，极大降低了哈希冲突的可能性，所以可以直接使用开放定址法即可。</p>
+]]></content>
+      <categories>
+        <category>Java</category>
+        <category>Netty</category>
+      </categories>
+      <tags>
+        <tag>ThreadLocal</tag>
+        <tag>FastThreadLocal</tag>
       </tags>
   </entry>
 </search>
