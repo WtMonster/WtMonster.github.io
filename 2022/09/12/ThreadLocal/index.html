@@ -30,7 +30,7 @@
 <meta property="og:image" content="https://github.com/WtMonster/WtMonster.github.io.git/2022/09/12/ThreadLocal/image-20220401210612680.png">
 <meta property="og:image" content="https://github.com/WtMonster/WtMonster.github.io.git/2022/09/12/ThreadLocal/image-20220401215400663.png">
 <meta property="article:published_time" content="2022-09-12T09:24:27.000Z">
-<meta property="article:modified_time" content="2022-09-14T16:18:00.285Z">
+<meta property="article:modified_time" content="2022-09-15T10:18:27.261Z">
 <meta property="article:author" content="WtMonster">
 <meta property="article:tag" content="ThreadLocal">
 <meta property="article:tag" content="FastThreadLocal">
@@ -223,7 +223,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-09-15 00:18:00" itemprop="dateModified" datetime="2022-09-15T00:18:00+08:00">2022-09-15</time>
+                <time title="Modified: 2022-09-15 18:18:27" itemprop="dateModified" datetime="2022-09-15T18:18:27+08:00">2022-09-15</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -287,6 +287,9 @@
 <li><p>ThreadLocal通过弱引用使得reference，也就是ThreadLocal这个key可以被回收（在只有这个弱引用关系时）</p>
 </li>
 <li><p>如果set的是一个全新为null的slot，而非被回收了弱引用的，也非正常使用的entry，那么set时会顺带进行一次启发式清理，这个清理是从当前下标开始清理log2(n)<strong>次</strong>（n是当前size，也就是元素数量）</p>
+<blockquote>
+<p>这里只举例说明了slot为null的情况，其他情况比如key为null也是会尝试进行清理的，另外get在哈希下标位置没找到的时候也会尝试进行清理</p>
+</blockquote>
 <blockquote>
 <p>值得注意的</p>
 <p>这里的清理是按次数来算的，每次清理都会以遇到空slot为止，并且会对清理过程中的有效entry重新hash</p>

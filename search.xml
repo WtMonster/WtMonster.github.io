@@ -366,6 +366,9 @@
 </li>
 <li><p>如果set的是一个全新为null的slot，而非被回收了弱引用的，也非正常使用的entry，那么set时会顺带进行一次启发式清理，这个清理是从当前下标开始清理log2(n)<strong>次</strong>（n是当前size，也就是元素数量）</p>
 <blockquote>
+<p>这里只举例说明了slot为null的情况，其他情况比如key为null也是会尝试进行清理的，另外get在哈希下标位置没找到的时候也会尝试进行清理</p>
+</blockquote>
+<blockquote>
 <p>值得注意的</p>
 <p>这里的清理是按次数来算的，每次清理都会以遇到空slot为止，并且会对清理过程中的有效entry重新hash</p>
 <p>这里修改了<em>Knuth</em>高德纳的著作TAOCP（《计算机程序设计艺术》）的<em>6.4</em>章节（散列) 中的<em>R</em>算法</p>
