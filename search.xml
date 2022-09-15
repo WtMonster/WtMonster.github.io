@@ -17,12 +17,12 @@
 </li>
 <li><p>在JDK1.7 字符串常量池、静态变量等被从方法区拿到了堆中, 这里没有提到运行时常量池,也就是说 字符串常量池被单独拿到堆,运行时常量池剩下的东西还在方法区, 也就是hotspot中的永久代</p>
 <blockquote>
-<p>这里错了，字符串常量池并没有被移动，还是在native memory，移动的是String实例</p>
+<p>字符串常量池本身并没有被移动，还是在native memory，移动的是String实例，也就是逻辑上移动到了堆</p>
 </blockquote>
 </li>
 <li><p>在JDK1.8 hotspot移除了永久代用元空间(Metaspace)取而代之, 这时候字符串常量池还在堆, 运行时常量池还在方法区, 只不过方法区的实现从永久代变成了元空间(Metaspace)</p>
 <blockquote>
-<p>字符串常量池（StringTable）在native memory</p>
+<p>字符串常量池（StringTable）在native memory，一般逻辑上认为在堆里面</p>
 </blockquote>
 </li>
 <li><p>JDK1.8-1.9,String底层从char数组变成了byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
