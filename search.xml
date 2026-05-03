@@ -1,123 +1,179 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>JDK21 升级适用指南</title>
-    <url>/2024/08/01/01-jdk21-upgrade-practice/</url>
-    <content><![CDATA[<p>当前升级 JDK 的动力实际上主要来自三项：ZGC、虚拟线程、衍生生态。</p>
-<p>以下对 JDK 高版本主要特性做一个总览分析。这里不写成“JDK21 新特性大全”，只记录我在实际升级时比较关心的收益、适用场景和风险。</p>
+    <title>JDK25 与 Leyden 相关进展记录</title>
+    <url>/2024/10/05/05-jdk25-leyden-follow-up/</url>
+    <content><![CDATA[<p>这篇是 JDK21 升级之后继续关注的一些方向，主要包括 Loom、JVM、JFR、GC、对象头压缩，以及 Leyden。</p>
+<p>JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。</p>
 <span id="more"></span>
 
-<h2 id="1-总体分析"><a href="#1-总体分析" class="headerlink" title="1. 总体分析"></a>1. 总体分析</h2><h3 id="ZGC"><a href="#ZGC" class="headerlink" title="ZGC"></a>ZGC</h3><p>优点：ZGC 基本消除了 GC 带来的延迟，并且对大对象有更好的处理。</p>
-<p>不足：ZGC 吞吐量比不上 G1。即便分代 ZGC 吞吐量有了很大提升，但与 G1 依然有一定差距。</p>
-<p>我的理解是，如果应用的问题主要是 GC pause 带来的长尾，ZGC 值得优先验证。如果应用本身更看重极限吞吐，或者 GC 本来就不是瓶颈，那就不要只因为“新”而切。</p>
-<h3 id="虚拟线程"><a href="#虚拟线程" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>优点：适用 IO 密集型应用。一方面可以提高系统性能，另一方面可以极大消除线程带来的内存压力。</p>
-<p>不足：在目前 JDK21 的版本中，虚拟线程存在的坑还比较多，个人不建议在可靠性要求较高的应用上直接大规模使用。</p>
-<p>尤其需要注意 <code>synchronized</code> 与虚拟线程绑定平台线程的问题。轻则降低吞吐量，严重可能导致死锁。虚拟线程可以灰度，但不要和 JDK 升级本身混成一个变量。</p>
-<h3 id="衍生生态"><a href="#衍生生态" class="headerlink" title="衍生生态"></a>衍生生态</h3><p>许多 Java 生态框架都基于高版本 JDK 开发，并不再维护低 JDK 版本。如果想要探索基于高版本的框架，那么升级 JDK 也是势在必行的了。</p>
-<p>这类收益不一定马上体现在接口耗时上，但会体现在后续框架升级、依赖治理、工具链维护成本上。</p>
-<h2 id="2-什么应用适合升级-JDK？"><a href="#2-什么应用适合升级-JDK？" class="headerlink" title="2. 什么应用适合升级 JDK？"></a>2. 什么应用适合升级 JDK？</h2><table>
+<h2 id="Loom（虚拟线程）"><a href="#Loom（虚拟线程）" class="headerlink" title="Loom（虚拟线程）"></a>Loom（虚拟线程）</h2><table>
 <thead>
 <tr>
-<th>目标</th>
-<th>适用应用</th>
-<th>具体版本</th>
-<th>风险</th>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>ZGC</td>
-<td>GC 延迟敏感的应用，例如缓存应用；本地有大缓存、频繁生成大对象的应用</td>
-<td>如果对吞吐量追求不高，可以考虑 JDK17 以上；如果对吞吐量有较高要求，需要升级 JDK21，并且开启分代特性</td>
-<td>分代 ZGC 需要经过充分验证后才可上线</td>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a></td>
+<td>解决了虚拟线程在 <code>synchronized</code> 上绑定的问题。虚拟线程从此可以更大规模使用了，但类加载等场景依然需要关注。</td>
 </tr>
 <tr>
-<td>虚拟线程</td>
-<td>IO 密集型应用都可以评估，文件 IO 场景需要单独验证</td>
-<td>JDK21</td>
-<td><code>synchronized</code> 兼容不好时会导致虚拟线程与平台线程绑定，轻则降低吞吐量，严重可能导致死锁</td>
-</tr>
-<tr>
-<td>衍生生态</td>
-<td>需要按自己实际调研进行升级考虑，例如新框架、新工具链、新运行时能力</td>
-<td>按框架要求决定</td>
-<td>依赖兼容、构建插件、运行参数都要重新检查</td>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a></td>
+<td>引入一种全新的、基于显式作用域管理的值传递方式。</td>
 </tr>
 </tbody></table>
-<p>这张表其实就是我的升级优先级判断：先明确收益目标，再决定升级策略。不要为了“统一版本”把 GC、虚拟线程、依赖升级一次性全打开。</p>
-<h2 id="3-实际收益"><a href="#3-实际收益" class="headerlink" title="3. 实际收益"></a>3. 实际收益</h2><h3 id="分代-ZGC"><a href="#分代-ZGC" class="headerlink" title="分代 ZGC"></a>分代 ZGC</h3><p>我们对一个缓存型服务升级了 JDK21，并使用分代 ZGC。在没有明显观察到资源占用提高的前提下，解决了 GC 带来的长尾问题。</p>
-<p>原始记录里这里有两张内部监控图，一张是发布前后的长尾响应耗时，一张是 JDK11 + G1 与 JDK21 + ZGC 的对比。公开版不放内部截图，只保留结论：</p>
-<ul>
-<li>接口响应时间本身不慢，但尾延迟容易被 GC pause 拉高。</li>
-<li>JDK21 + 分代 ZGC 后，长尾响应耗时有明显收敛。</li>
-<li>观察时不能只看 pause time，也要看 CPU、RSS、吞吐。</li>
-</ul>
-<p>另外可以参考 Netflix 这篇文章：</p>
-<p><a href="https://netflixtechblog.com/bending-pause-times-to-your-will-with-generational-zgc-256629c9386b">https://netflixtechblog.com/bending-pause-times-to-your-will-with-generational-zgc-256629c9386b</a></p>
-<h3 id="虚拟线程-1"><a href="#虚拟线程-1" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>我们在一个 IO 密集型服务里做过全面 JDK21 升级，并进行了虚拟线程灰度验证。</p>
-<p>当时观察到的一个现象是：对比非虚拟线程，平台线程数从 2000 左右降低到 300+。中间有一段时间因为某个依赖组件还不支持虚拟线程，内部仍然开了几百个平台线程；后续替换为虚拟线程池后，线程数量继续下降。</p>
-<p>接口 P95 的灰度对比大概是：</p>
-<table>
+<p>JDK21 里虚拟线程已经正式可用，但如果从生产大规模使用角度看，我认为 JDK24 的 JEP 491 非常关键。</p>
+<h2 id="JVM-相关"><a href="#JVM-相关" class="headerlink" title="JVM 相关"></a>JVM 相关</h2><table>
 <thead>
 <tr>
-<th>场景</th>
-<th>非虚拟线程 JDK21 P95</th>
-<th>虚拟线程 JDK21 P95</th>
-<th>降幅</th>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>列表查询</td>
-<td>284</td>
-<td>239</td>
-<td>19%</td>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
+<td>完成 Lilliput 项目的第一阶段，将对象头从 128 位减小到 64 位，下一阶段目标是 32 位。对象很多的应用可能会有内存收益，具体效果和项目本身关系比较大。</td>
 </tr>
 <tr>
-<td>详情查询</td>
-<td>589</td>
-<td>493</td>
-<td>16.3%</td>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
+<td>Shenandoah 也进入分代方向。不过 JDK25 里默认仍是单代 Shenandoah。低延迟 GC 后面基本都在利用分代假说继续优化。</td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
+<td>支持对指定方法做更精确的耗时统计和 tracing。这个对线上分析很有吸引力，但生产开启范围和开销要认真控制。</td>
+</tr>
+<tr>
+<td>23 / 24</td>
+<td><a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> / <a href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
+<td>ZGC 后续只有分代模式了。实测我认为绝大部分情况下分代 ZGC 优于单代 ZGC，少部分不符合分代假说的极端情况除外。</td>
 </tr>
 </tbody></table>
-<p>加上升级 JDK21 本身带来的优化，对比 JDK11 的应用，虚拟线程 + JDK21 带来的 P95 降幅大概在 20%。</p>
-<p>这里需要强调：这个结果只说明“这类 IO 密集型场景值得测”，不代表所有服务开虚拟线程都会变快。</p>
-<h2 id="4-升级前准备"><a href="#4-升级前准备" class="headerlink" title="4. 升级前准备"></a>4. 升级前准备</h2><h3 id="IDE"><a href="#IDE" class="headerlink" title="IDE"></a>IDE</h3><p>IDE 要能正确支持 JDK21 的语法、编译、调试和运行配置。版本对应关系直接看官方说明：</p>
-<p><a href="https://www.jetbrains.com/help/idea/supported-java-versions.html">https://www.jetbrains.com/help/idea/supported-java-versions.html</a></p>
-<p>原始笔记里有一些本地安装和激活相关内容，公开博客不保留。</p>
-<h3 id="Maven"><a href="#Maven" class="headerlink" title="Maven"></a>Maven</h3><p>JDK 升级时 Maven 也要检查，尤其是：</p>
-<ul>
-<li><code>maven-compiler-plugin</code> 是否支持 JDK21。</li>
-<li><code>maven-surefire-plugin</code> / <code>maven-failsafe-plugin</code> 是否能在 JDK21 下正常跑测试。</li>
-<li>IDE 内置 Maven 与项目 Maven 版本是否一致。</li>
-<li>依赖 import 是否正常。</li>
+<h2 id="语法-amp-core-lib"><a href="#语法-amp-core-lib" class="headerlink" title="语法 &amp; core-lib"></a>语法 &amp; core-lib</h2><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/485">JEP 485: Stream Gatherers</a></td>
+<td>提供更灵活的 stream 流处理方式，并且提供了一些内置扩展。</td>
+</tr>
+<tr>
+<td>22</td>
+<td><a href="https://openjdk.org/jeps/456">JEP 456: Unnamed Variables &amp; Patterns</a></td>
+<td>可以使用下划线 <code>_</code> 来命名未使用的变量。</td>
+</tr>
+<tr>
+<td>23</td>
+<td><a href="https://openjdk.org/jeps/467">JEP 467: Markdown Documentation Comments</a></td>
+<td>注释支持 Markdown 格式。</td>
+</tr>
+</tbody></table>
+<h2 id="底层库"><a href="#底层库" class="headerlink" title="底层库"></a>底层库</h2><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>22</td>
+<td><a href="https://openjdk.org/jeps/454">JEP 454: Foreign Function &amp; Memory API</a></td>
+<td>提供标准 FFM API，用于调用其他语言代码以及本地内存管理。</td>
+</tr>
+<tr>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/484">JEP 484: Class-File API</a></td>
+<td>提供用于解析、生成和转换 Java 类文件的标准 API。</td>
+</tr>
+</tbody></table>
+<h2 id="Leyden-相关"><a href="#Leyden-相关" class="headerlink" title="Leyden 相关"></a>Leyden 相关</h2><h3 id="DONE"><a href="#DONE" class="headerlink" title="DONE"></a>DONE</h3><ul>
+<li><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></li>
+<li><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></li>
+<li><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></li>
+<li><a href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></li>
 </ul>
-<p>有些问题不是 JDK21 本身导致的，而是 IDE、Maven、插件版本组合导致的。</p>
-<h3 id="运行参数"><a href="#运行参数" class="headerlink" title="运行参数"></a>运行参数</h3><p>升级时要重点检查旧参数：</p>
-<ul>
-<li>旧 GC 参数是否还存在，例如 CMS 相关参数。</li>
-<li>GC 日志是否迁移到 <code>-Xlog</code>。</li>
-<li><code>--add-opens</code> 是否仍然需要。</li>
-<li>agent 是否兼容 JDK21。</li>
-<li>监控、诊断、热修复工具是否依赖 JDK internals。</li>
+<p>这里和我最初整理时有一个变化：JEP 516 已经是 JDK26 delivered，不再是 doing 状态。所以如果只讨论 JDK25，需要把它放到“后续继续关注”的位置；如果讨论 Leyden 路线，就可以一起看。</p>
+<h3 id="DOING-继续关注"><a href="#DOING-继续关注" class="headerlink" title="DOING / 继续关注"></a>DOING / 继续关注</h3><ul>
+<li>AOT Code Compilation 相关草案。</li>
+<li>对更多 class loader 场景的支持。</li>
+<li>和 Spring Boot 打包、jar 展开、CDS 的工程化结合。</li>
+<li>启动参数、训练流程和正式启动流程的隔离。</li>
 </ul>
-<h2 id="5-我的升级建议"><a href="#5-我的升级建议" class="headerlink" title="5. 我的升级建议"></a>5. 我的升级建议</h2><p>我更倾向于拆成几个阶段：</p>
-<ol>
-<li>只升级运行时，不换 GC，不开虚拟线程。</li>
-<li>压测 JDK21 + 原 GC，确认运行时升级本身没有问题。</li>
-<li>单独验证 JDK21 + 分代 ZGC。</li>
-<li>单独验证 JDK21 + 虚拟线程。</li>
-<li>如果要上虚拟线程，必须有独立开关和灰度策略。</li>
+<h2 id="核心-JEP-解读"><a href="#核心-JEP-解读" class="headerlink" title="核心 JEP 解读"></a>核心 JEP 解读</h2><h3 id="JEP-483"><a href="#JEP-483" class="headerlink" title="JEP 483"></a>JEP 483</h3><p><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
+<p>存储类加载和链接的训练数据。它关注的是应用启动时反复做的类加载、解析、链接工作，能不能提前做一部分。</p>
+<p>tips：</p>
+<p>对 lambda 等的优化会比较大。</p>
+<p>需要注意的是，它不是把 Java 变成 native 可执行文件，也不是直接消除 JVM 动态性。它更像是让 JVM 在启动时少做一部分重复工作。</p>
+<h3 id="JEP-515"><a href="#JEP-515" class="headerlink" title="JEP 515"></a>JEP 515</h3><p><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
+<p>存储方法调用数据，例如方法执行次数等，以便 JIT 了解方法执行情况，可以直接进行对应层级的编译优化。</p>
+<p>tips：</p>
+<p>这样做需要注意，由于 JIT 已知方法执行情况，理想情况下可以认为热点 path 代码可以在首次触达时即完成 JIT 优化。这对 CPU 资源的开销可能会比较大。</p>
+<p>也就是说，如果直接接入峰值流量，启动初期消耗的 CPU 资源可能较高，可能依然需要慢启动流程。不过流量放大的速度可以比现在快很多。</p>
+<p>未来 AOT Code Compilation 完成后，上述问题可能会继续改善。</p>
+<h3 id="JEP-514"><a href="#JEP-514" class="headerlink" title="JEP 514"></a>JEP 514</h3><p><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></p>
+<p>作用是改善 AOT 命令行体验，把训练和生成配置的流程包装得顺一点。</p>
+<p>这个 JEP 本身不算最核心的性能能力，但对工程化很重要。AOT 相关能力如果使用成本太高，就很难真正进入普通服务发布流程。</p>
+<p>目前需要注意的是：生成训练数据时的启动参数和正式启动应用时不应该简单完全复用。例如管理端口、监控端口、临时目录、文件路径，都可能在训练生成阶段产生冲突。</p>
+<h3 id="JEP-516"><a href="#JEP-516" class="headerlink" title="JEP 516"></a>JEP 516</h3><p><a href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></p>
+<p>JEP 516 是 JDK26 的内容，不属于 JDK25，但它很能说明 Leyden 的方向：不只是类加载和链接，后续还会把一些对象状态提前缓存。</p>
+<p>这个方向对启动和预热会有更大帮助。但具体到业务应用收益、和应用框架如何结合、训练数据如何设计，仍然需要继续观察。</p>
+<h2 id="目前最大的问题"><a href="#目前最大的问题" class="headerlink" title="目前最大的问题"></a>目前最大的问题</h2><h3 id="class-loader"><a href="#class-loader" class="headerlink" title="class loader"></a>class loader</h3><p>Leyden 相关能力很容易受 class loader 影响。</p>
+<p>简单 classpath 应用是一回事，真实服务经常还有：</p>
+<ul>
+<li>fat jar / nested jar。</li>
+<li>应用服务器 class loader。</li>
+<li>插件化 class loader。</li>
+<li>框架自定义 class loader。</li>
+<li>agent 或字节码增强。</li>
+</ul>
+<p>所以不要只看简单 demo 的效果。真实服务要看自己的打包方式和类加载路径。</p>
+<p>Spring Boot 这类框架已经在 jar 展开、CDS、AOT 方向做了一些工作，普通服务优先看框架集成会更稳。</p>
+<p>相关资料：</p>
+<ul>
+<li><a href="https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation">https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation</a></li>
+<li><a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></li>
+<li><a href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></li>
+</ul>
+<h3 id="GC-支持"><a href="#GC-支持" class="headerlink" title="GC 支持"></a>GC 支持</h3><p>早期 Leyden/AOT 能力和 GC 的配合有一些限制，后续 JEP 516 已经推进到 Any GC。</p>
+<p>对业务应用来说，比较理想的状态是：不需要为了启动优化放弃原本选择的 GC。</p>
+<h3 id="训练流量"><a href="#训练流量" class="headerlink" title="训练流量"></a>训练流量</h3><p>AOT profile 类能力依赖训练数据。训练数据是否代表真实流量，会直接影响收益。</p>
+<p>如果训练流量和真实流量差异很大，可能只优化了启动路径，没优化真正的业务热点路径。对复杂服务来说，训练阶段如何设计是一个工程问题，不只是 JVM 参数问题。</p>
+<h2 id="Leyden-和-Native-Image-的区别"><a href="#Leyden-和-Native-Image-的区别" class="headerlink" title="Leyden 和 Native Image 的区别"></a>Leyden 和 Native Image 的区别</h2><p>Leyden 相比 Native Image 而言，不会砍掉 JVM 的动态性。对开发而言可以做到基本无感。</p>
+<p>Leyden 项目不打算直接合并 GraalVM 的工作，而是参考一部分 Graal 思路的同时，在项目开始时保留一部分运行时特征。</p>
+<p>相关背景：</p>
+<ul>
+<li><a href="https://www.infoq.com/news/2022/06/project-leyden-delays-aot/">https://www.infoq.com/news/2022/06/project-leyden-delays-aot/</a></li>
+<li><a href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></li>
+<li><a href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></li>
+<li><a href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></li>
+</ul>
+<p>我的理解是：</p>
+<ul>
+<li>Native Image 更激进，收益明显，约束也明显。</li>
+<li>Leyden 更温和，更适合大量依赖 JVM 动态性的传统 Java 服务。</li>
+</ul>
+<h2 id="需要关注的工作"><a href="#需要关注的工作" class="headerlink" title="需要关注的工作"></a>需要关注的工作</h2><ol>
+<li>JEP 491 后，虚拟线程在真实服务里的风险是否明显降低。</li>
+<li>JFR Method Timing &amp; Tracing 的生产使用方式和开销。</li>
+<li>Compact Object Headers 对对象密集型服务的实际内存收益。</li>
+<li>ZGC/Shenandoah 分代化之后的真实吞吐和延迟表现。</li>
+<li>Leyden 和 Spring Boot、CDS、jar 展开的集成路径。</li>
+<li>AOT profile/缓存能力对启动、预热、扩容速度的改善。</li>
 </ol>
-<p>这样做的好处是问题好定位。否则 JDK 版本、GC、虚拟线程、依赖升级混在一起，一旦指标异常，很难判断到底是哪一个变量导致的。</p>
-<p>如果虚拟线程有问题，优先关闭虚拟线程，不要直接回滚 JDK。</p>
-<p>如果 ZGC 表现不符合预期，优先切回原 GC。</p>
-<p>只有运行时兼容本身有问题，才需要回退 JDK。</p>
-<h2 id="6-小结"><a href="#6-小结" class="headerlink" title="6. 小结"></a>6. 小结</h2><p>JDK21 升级的价值主要在三件事：</p>
-<ol>
-<li>ZGC：解决一类 GC pause 导致的长尾问题。</li>
-<li>虚拟线程：降低 IO 密集型服务的平台线程成本。</li>
-<li>衍生生态：让后续框架、工具链、运行时能力升级更顺。</li>
-</ol>
-<p>我的结论比较简单：JDK21 可以作为新的运行时基线去推进，但虚拟线程不要因为“正式发布了”就直接大规模用。JDK 升级和虚拟线程上线是两件事。</p>
+<p>JDK21 升级完以后，不代表这条线结束。JDK21 是一个适合落地的版本；JDK24/JDK25/JDK26 展示的是后续演进方向。</p>
 ]]></content>
       <categories>
         <category>Java</category>
@@ -126,458 +182,9 @@
         <tag>Java</tag>
         <tag>JDK21</tag>
         <tag>JVM</tag>
-        <tag>ZGC</tag>
-        <tag>Virtual Threads</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>JDK8 到 JDK21 重要特性梳理</title>
-    <url>/2024/08/18/02-jdk21-feature-selection/</url>
-    <content><![CDATA[<p>注意：预览功能非必要不建议使用。</p>
-<p>以下表格去除了大部分日常开发不需要感知的特性，按照个人理解根据重要性、影响程度，以及日常开发需要关注的程度进行排序。会比较主观，欢迎补充和指正。</p>
-<span id="more"></span>
-
-<p>参考入口：</p>
-<ul>
-<li><a href="https://openjdk.org/jeps/0">https://openjdk.org/jeps/0</a></li>
-<li><a href="https://openjdk.org/projects/jdk/17/jeps-since-jdk-11">https://openjdk.org/projects/jdk/17/jeps-since-jdk-11</a></li>
-<li><a href="https://openjdk.org/projects/jdk/21/jeps-since-jdk-17">https://openjdk.org/projects/jdk/21/jeps-since-jdk-17</a></li>
-<li><a href="https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html">https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html</a></li>
-<li><a href="https://github.com/nipafx/demo-java-x">https://github.com/nipafx/demo-java-x</a></li>
-</ul>
-<h2 id="1-语言"><a href="#1-语言" class="headerlink" title="1. 语言"></a>1. 语言</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>Description</th>
-<th>Project &amp; Tags</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/395">JEP 395: Records</a></td>
-<td>16</td>
-<td>充当不可变数据的载体的类，与元组形式类似，拥有极简单的类结构。有一些序列化相关特性需要注意。</td>
-<td>Amber - language</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/430">JEP 430: String Templates (Preview)</a></td>
-<td>21</td>
-<td>提供字符串模板和嵌入表达式生成字符串的方式。这个方向很有意思，但后来打算重做，这也是我不建议开启预览功能的原因之一。</td>
-<td>Amber - language、performance</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> / <a href="https://openjdk.org/jeps/394">JEP 394</a> / <a href="https://openjdk.org/jeps/440">JEP 440</a> / <a href="https://openjdk.org/jeps/441">JEP 441</a></td>
-<td>14 / 16 / 21 / 21</td>
-<td>对 switch 表达式、instanceof 类型转换、Record 模式匹配都做了简化。嵌套 Record 的场景会比较明显。</td>
-<td>Amber - language</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a></td>
-<td>10</td>
-<td><code>var</code> 可以用，但我建议只在特定情境下使用：不关心具体类型，或者可以在上下文中明确直接看到类型信息。比如 Stream 里某些很长的泛型类型。</td>
-<td>Amber - language</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a></td>
-<td>15</td>
-<td>可以使用三个双引号包含多行字符串。写 SQL、JSON、测试数据会舒服很多。</td>
-<td>Amber - language</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a></td>
-<td>17</td>
-<td>密封类，可以限制哪些其他类或接口可以继承或实现它们。</td>
-<td>Amber - specification</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a></td>
-<td>21</td>
-<td>提供了一套有序集合接口标准。不是大特性，但补上了集合框架里长期不太顺手的一块。</td>
-<td>Amber - specification</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/309">JEP 309: Dynamic Class-File Constants</a></td>
-<td>11</td>
-<td>提供类似 invokedynamic 的常量创建形式，一种使用场景是通过这种方式实现高性能懒加载单例。</td>
-<td>Valhalla</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/443">JEP 443: Unnamed Patterns and Variables (Preview)</a></td>
-<td>21</td>
-<td>对于没有用的变量可以用 <code>_</code> 代替命名表示省略。JDK21 中仍然是 Preview。</td>
-<td>Amber - language</td>
-</tr>
-</tbody></table>
-<p>语言特性我个人最容易用起来的是 Records、Text Blocks、switch/pattern matching、Sequenced Collections。Preview 功能可以看，但不建议作为生产主链路基础。</p>
-<h2 id="2-JVM-amp-Compiler"><a href="#2-JVM-amp-Compiler" class="headerlink" title="2. JVM &amp; Compiler"></a>2. JVM &amp; Compiler</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/377">ZGC(JEP377)</a> &amp; <a href="https://openjdk.org/jeps/379">Shenandoah(JEP379)</a></td>
-<td>15</td>
-<td>ZGC 和 Shenandoah 发布了生产版本。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a></td>
-<td>21</td>
-<td>ZGC 支持分代了，提升很大，但是需要充分压测。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/328">JEP 328: Flight Recorder</a></td>
-<td>11</td>
-<td>绝对的神器，已经 backport 到 jdk8u262，现在不少 JDK8 服务也可以用。JDK 升级、GC 选型、虚拟线程灰度都应该用 JFR 看证据。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/307">JEP 307: Parallel Full GC for G1</a></td>
-<td>10</td>
-<td>我原始笔记里写过“G1 支持并发 fullgc”，更准确地说是 G1 Full GC 并行化。16GB 堆在一些场景下也可以压到秒级以内。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/158">JEP 158: Unified JVM Logging</a> / <a href="https://openjdk.org/jeps/271">JEP 271: Unified GC Logging</a></td>
-<td>9</td>
-<td>规范化了虚拟机日志和 GC 日志，升级时旧 GC 日志参数要迁移到 <code>-Xlog</code>。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/345">JEP 345: NUMA-Aware Memory Allocation for G1</a></td>
-<td>14</td>
-<td>支持对 NUMA 架构的感知，特定场景下有意义。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/280">JEP 280: Indify String Concatenation</a></td>
-<td>9</td>
-<td>编译时通过 invokedynamic 实现字符串拼接，以前是 StringBuilder，也为多语言铺路。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/312">JEP 312: Thread-Local Handshakes</a></td>
-<td>10</td>
-<td>线程局部握手，某些 VM 操作不用总等全局安全点。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/451">JEP 451: Prepare to Disallow the Dynamic Loading of Agents</a></td>
-<td>21</td>
-<td>JDK 准备在将来的版本中默认禁止对正在运行的 JVM 动态加载 agent。监控、诊断、热修复相关工具都要提前验证。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/346">JEP 346: Promptly Return Unused Committed Memory from G1</a></td>
-<td>12</td>
-<td>G1 会更好地返还内存给操作系统，但不一定对所有业务有感知。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/344">JEP 344: Abortable Mixed Collections for G1</a></td>
-<td>12</td>
-<td>G1 能够通过划分必须回收区域、非必需回收区域来更精确地控制 MixedGC 耗时。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/318">JEP 318: Epsilon: A No-Op Garbage Collector</a></td>
-<td>11</td>
-<td>无 GC 收集器，这玩意一般用不上，更多是实验和测试场景。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/416">JEP 416: Reimplement Core Reflection with Method Handles</a></td>
-<td>18</td>
-<td>使用 MethodHandles 重新实现反射。部分场景变快，部分场景变慢，主要目的是规范化。顺带一提，Java 明显想尽量减少 C 代码，替换成 Java 实现。</td>
-</tr>
-</tbody></table>
-<p>这部分才是 JDK 升级时更应该关注的地方。语言特性只是表面，运行时行为变化才决定上线风险。</p>
-<h2 id="3-Other"><a href="#3-Other" class="headerlink" title="3. Other"></a>3. Other</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>Description</th>
-<th>Project &amp; Tags</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a></td>
-<td>21</td>
-<td>唯一真神，虚拟线程。但 JDK21 上坑比较多，暂不适用于可靠性要求较高的生产环境直接大规模使用。</td>
-<td>Loom</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/446">JEP 446: Scoped Values (Preview)</a></td>
-<td>21</td>
-<td>能在许多场景下替代 ThreadLocal，但注意，它并不是为了完全取代 ThreadLocal，也取代不了所有用法。</td>
-<td>Loom</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/453">JEP 453: Structured Concurrency (Preview)</a></td>
-<td>21</td>
-<td>结构化并发提供任务组的结构化组织方式，和虚拟线程适配很好。JDK21 里还是 Preview。</td>
-<td>Loom</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/412">JEP 412: Foreign Function &amp; Memory API</a></td>
-<td>17</td>
-<td>Panama 对 JDK 的影响其实比 Loom 可能更大，只是对上层开发者的影响不及 Loom。JDK21 阶段仍在预览演进，后续 JDK22 才稳定。</td>
-<td>Panama</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/448">JEP 448: Vector API (Sixth Incubator)</a></td>
-<td>21</td>
-<td>支持 SIMD 向量化加速计算。对 JSON 解析、压缩、数值计算等基础库更有价值。</td>
-<td>Panama</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/358">JEP 358: Helpful NullPointerExceptions</a></td>
-<td>14</td>
-<td>能够更准确地提供空指针异常信息。</td>
-<td>-</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/321">JEP 321: HTTP Client API</a></td>
-<td>11</td>
-<td>JDK 提供了一套标准 HTTP Client API。</td>
-<td>-</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/349">JEP 349: JFR Event Streaming</a></td>
-<td>14</td>
-<td>JFR 事件流，可以实现持续线上监控。我对虚拟线程 pin 问题的监控就是基于这个方向做的。</td>
-<td>-</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/259">JEP 259: Stack-Walking API</a></td>
-<td>9</td>
-<td>在 StackWalker 之前只能通过 <code>getStackTrace</code> 获取完整线程堆栈，StackWalker 允许只处理需要的 StackFrame。诊断工具和框架比较有用。</td>
-<td>-</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/250">JEP 250</a> / <a href="https://openjdk.org/jeps/310">JEP 310</a> / <a href="https://openjdk.org/jeps/341">JEP 341</a> / <a href="https://openjdk.org/jeps/350">JEP 350</a></td>
-<td>9 / 10 / 12 / 13</td>
-<td>CDS/AppCDS，主要问题是需要提前构建好存档，有点麻烦。</td>
-<td>-</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/193">JEP 193: Variable Handles</a></td>
-<td>9</td>
-<td>通过 VarHandle 可以实现更细粒度的内存屏障控制，例如一些高性能缓存库会用。</td>
-<td>Code Tools</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/254">JEP 254: Compact Strings</a></td>
-<td>9</td>
-<td>String 底层从 char 变成 byte，内存占用可能减少，但特定场景下可能增加 CPU 开销。</td>
-<td>-</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/285">JEP 285: Spin-Wait Hints</a></td>
-<td>9</td>
-<td>自旋场景可以使用 <code>Thread.onSpinWait()</code> 给 CPU 提示。但注意它不是性能银弹，而且命中 C2 前基本等于啥也没干。</td>
-<td>-</td>
-</tr>
-</tbody></table>
-<h2 id="4-废弃和删除"><a href="#4-废弃和删除" class="headerlink" title="4. 废弃和删除"></a>4. 废弃和删除</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/374">JEP 374: Deprecate and Disable Biased Locking</a></td>
-<td>15</td>
-<td>偏向锁被废弃并默认关闭。大部分应用不用管，但老参数要清理。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/363">JEP 363: Remove the Concurrent Mark Sweep (CMS) Garbage Collector</a></td>
-<td>14</td>
-<td>CMS 移除了。还在用 CMS 参数的服务会直接启动失败。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/366">JEP 366: Deprecate the ParallelScavenge + SerialOld GC Combination</a></td>
-<td>14</td>
-<td>一些旧 GC 组合不再推荐。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/410">JEP 410: Remove the Experimental AOT and JIT Compiler</a></td>
-<td>17</td>
-<td>移除了实验性质的 AOT 和 Graal JIT。需要 AOT/JIT 相关能力的直接看 GraalVM 或后续 Leyden。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/214">JEP 214: Remove GC Combinations Deprecated in JDK 8</a></td>
-<td>9</td>
-<td>一些 JDK8 已废弃的 GC 组合被删除。</td>
-</tr>
-</tbody></table>
-<h2 id="5-JDK8-到-JDK21-升级时我会重点看什么"><a href="#5-JDK8-到-JDK21-升级时我会重点看什么" class="headerlink" title="5. JDK8 到 JDK21 升级时我会重点看什么"></a>5. JDK8 到 JDK21 升级时我会重点看什么</h2><ol>
-<li>GC 参数，尤其是 CMS、GC 日志、<code>-Xlog</code>。</li>
-<li>强封装，尤其是反射访问 JDK internals 的地方。</li>
-<li>agent 行为，尤其是动态 attach。</li>
-<li>JFR 是否能作为常态化观测手段。</li>
-<li>虚拟线程是否真的适合当前服务，不要只看宣传。</li>
-</ol>
-<p>结论还是那句话：JDK21 的价值不只是语法，真正影响生产升级的是运行时能力、观测能力和兼容性风险。</p>
-]]></content>
-      <categories>
-        <category>Java</category>
-      </categories>
-      <tags>
-        <tag>Java</tag>
-        <tag>JDK21</tag>
-        <tag>JVM</tag>
-        <tag>JEP</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Loom 虚拟线程相关问题记录</title>
-    <url>/2024/09/05/03-virtual-threads-production-practice/</url>
-    <content><![CDATA[<p>JDK21 的虚拟线程目前存在许多严重问题，尽量不要在可靠性要求较高的服务中直接大规模使用。</p>
-<p>这篇基本是我当时整理 Loom 问题时的笔记。不是虚拟线程入门，也不是“开箱即用教程”，重点是风险、死锁、监控和适配。</p>
-<span id="more"></span>
-
-<h2 id="简单介绍"><a href="#简单介绍" class="headerlink" title="简单介绍"></a>简单介绍</h2><p>虚拟线程使用一个专用的、FIFO 模式下的 ForkJoin 线程池。<code>parallelStream</code> 使用的是公共 ForkJoinPool，模式不一样。</p>
-<p>它的并行度就是承载虚拟线程的平台线程数，默认与可用核心数相等，也可以使用参数调整：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.virtualThreadScheduler.parallelism=&lt;n&gt;</span><br></pre></td></tr></table></figure>
-
-<p>虚拟线程的核心价值是：阻塞时可以从平台线程上卸载，让平台线程继续执行其他虚拟线程。所以它适合 IO 密集型场景，而不是 CPU 密集型场景。</p>
-<h2 id="推荐资料"><a href="#推荐资料" class="headerlink" title="推荐资料"></a>推荐资料</h2><p>以下资料主要是对 Java 虚拟线程的设计和思考，具体实现以 JDK 为准：</p>
-<ul>
-<li><a href="https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html">https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html</a></li>
-<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html</a></li>
-<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html</a></li>
-<li><a href="https://inside.java/2021/05/10/networking-io-with-virtual-threads/">https://inside.java/2021/05/10/networking-io-with-virtual-threads/</a></li>
-<li><a href="https://inside.java/2020/08/07/loom-performance/">https://inside.java/2020/08/07/loom-performance/</a></li>
-<li><a href="https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads">https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads</a></li>
-<li><a href="https://inside.java/2023/08/26/continuations-under-the-covers/">https://inside.java/2023/08/26/continuations-under-the-covers/</a></li>
-</ul>
-<p>如果对异步发展史感兴趣，可以看 Devoxx 相关分享：从线程到响应式，再到虚拟线程。</p>
-<h2 id="风险"><a href="#风险" class="headerlink" title="风险"></a>风险</h2><p>虚拟线程支持 ThreadLocal 和 <code>synchronized</code>，但是存在一些缺陷，有一些问题需要额外注意。</p>
-<h3 id="1-绑定问题"><a href="#1-绑定问题" class="headerlink" title="1. 绑定问题"></a>1. 绑定问题</h3><ol>
-<li><p>虚拟线程执行时，在 <code>synchronized</code> 块或方法中执行代码，会与平台线程绑定。同步块内，以及等待同步锁都会 pin。因此 JDK21 里需要尽量使用 <code>ReentrantLock</code> 替代。这个问题在 JDK24 的 <a href="https://openjdk.org/jeps/491">JEP 491</a> 里已经从底层解决了一大块。</p>
-</li>
-<li><p>虚拟线程执行 native 代码或外来函数时是无法被中止的。这个暂时无法完全从底层解决，典型场景之一是类初始化。</p>
-</li>
-</ol>
-<h3 id="2-死锁：这块风险在-JEP-中实际上被低估了"><a href="#2-死锁：这块风险在-JEP-中实际上被低估了" class="headerlink" title="2. 死锁：这块风险在 JEP 中实际上被低估了"></a>2. 死锁：这块风险在 JEP 中实际上被低估了</h3><p>最经典的场景，大部分死锁本质都是这类问题：<code>synchronized</code> 内外出现同一资源竞争。</p>
-<p>相关讨论：</p>
-<ul>
-<li><a href="https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/">https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/</a></li>
-<li><a href="https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html">https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html</a></li>
-<li><a href="https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html">https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html</a></li>
-</ul>
-<p>复现代码可以简化成这样：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">10</span>; i++) &#123;</span><br><span class="line">    Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">        System.out.println(Thread.currentThread() + <span class="string">&quot;: Before synchronized block&quot;</span>);</span><br><span class="line">        <span class="keyword">synchronized</span> (Main.class) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread() + <span class="string">&quot;: Inside synchronized block&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>更接近真实问题的代码可以简化为：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">1</span>; i++) &#123;</span><br><span class="line">    Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">        doSomethingWithLock();</span><br><span class="line">        <span class="keyword">synchronized</span> (Main.class) &#123;</span><br><span class="line">            doSomethingWithLock();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doSomethingWithLock</span><span class="params">()</span> &#123;</span><br><span class="line">    lock.lock();</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="comment">// do something</span></span><br><span class="line">    &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">        lock.unlock();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>大体原理是：</p>
-<p>Lock 内部实现的 AQS 使用 FIFO 队列来进行线程排队和资源抢占。对于已经在队列中的线程来说，无论是公平锁还是非公平锁，都遵循 FIFO。</p>
-<p>死锁场景是：FIFO 队列中，一个阻塞在同步块外部 lock 上的虚拟线程排在前面，一个阻塞在同步块内部 lock 上的虚拟线程排在后面。当某个线程释放 lock 时，会把队列前面的虚拟线程 unpark，然后自身马上停靠在 <code>synchronized</code> 同步块上被绑定。</p>
-<p>此时其他虚拟线程都在 pinned 状态，占用了所有平台线程。这个 unpark 是无效的，因为被唤醒的虚拟线程没有平台线程可以绑定，也就无法继续抢锁；而真正能推进状态的线程又排在队列后面，最终卡住。</p>
-<p>如果摒弃 <code>ReentrantLock</code> 的影响，实际状态可以简化为类似下面的代码。这个例子需要只有一个载体线程：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.virtualThreadScheduler.parallelism=1</span><br><span class="line">--add-opens java.base/jdk.internal.misc=ALL-UNNAMED</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.internal.misc.VirtualThreads;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestThreadDeadLock</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> <span class="type">int</span> <span class="variable">vt1state</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> <span class="type">int</span> <span class="variable">vt2state</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">        <span class="type">Thread</span> <span class="variable">vt1</span> <span class="operator">=</span> Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">            VirtualThreads.park();</span><br><span class="line">            vt1state++;</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (!Thread.State.WAITING.equals(vt1.getState())) &#123;</span><br><span class="line">            Thread.onSpinWait();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">            VirtualThreads.unpark(vt1);</span><br><span class="line">            syncPark();</span><br><span class="line">            vt2state++;</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">            Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;vt1state:&quot;</span> + vt1state + <span class="string">&quot; vt2state: &quot;</span> + vt2state);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title function_">syncPark</span><span class="params">()</span> &#123;</span><br><span class="line">        VirtualThreads.park();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>运行后 <code>vt1</code> 被 unpark 也无法执行到 <code>vt1state++</code>。</p>
-<h3 id="3-Native-或-FFI-导致的死锁"><a href="#3-Native-或-FFI-导致的死锁" class="headerlink" title="3. Native 或 FFI 导致的死锁"></a>3. Native 或 FFI 导致的死锁</h3><p>这个可能比较难发生，但是与同步块的死锁同理。</p>
-<p>例如在类加载内与类加载外存在 <code>ReentrantLock</code>，或者其他资源抢占，就可能发生。</p>
-<h3 id="4-平台线程资源耗尽"><a href="#4-平台线程资源耗尽" class="headerlink" title="4. 平台线程资源耗尽"></a>4. 平台线程资源耗尽</h3><p>这个问题源于线程 pinning，需要注意：</p>
-<ul>
-<li><a href="https://blog.ydb.tech/how-we-switched-to-java-21-virtual-threads-and-got-deadlock-in-tpc-c-for-postgresql-cca2fe08d70b">https://blog.ydb.tech/how-we-switched-to-java-21-virtual-threads-and-got-deadlock-in-tpc-c-for-postgresql-cca2fe08d70b</a></li>
-<li><a href="https://news.ycombinator.com/item?id=39008026">https://news.ycombinator.com/item?id=39008026</a></li>
-</ul>
-<h2 id="ThreadLocal"><a href="#ThreadLocal" class="headerlink" title="ThreadLocal"></a>ThreadLocal</h2><p>ThreadLocal 的问题主要在于线程模型变化。</p>
-<p>没有虚拟线程前，我们可以假定线程数不会太多。但是虚拟线程打破了这个限制，一个系统可能同时存在非常多虚拟线程。</p>
-<p>因此 ThreadLocal 的数据量就可能非常非常多，这也就是 ThreadLocal 的风险所在。用的时候注意一下就好。</p>
-<p>这里 cue 一下 ScopedValue。有些人可能期望使用 ScopedValue 完全替代 ThreadLocal，其实这是不现实的。</p>
-<p>最典型的是 ThreadLocal 用于资源池化的场景，例如 Jackson 和 Log4j2 中都有这种用法。Log4j2 的 ReusableMessage 后来也老实换成普通资源池了：</p>
-<p><a href="https://github.com/apache/logging-log4j2/pull/1401">https://github.com/apache/logging-log4j2/pull/1401</a></p>
-<h2 id="监控"><a href="#监控" class="headerlink" title="监控"></a>监控</h2><h3 id="1-JFR"><a href="#1-JFR" class="headerlink" title="1. JFR"></a>1. JFR</h3><p>可以使用 JFR 来观察虚拟线程在绑定时的挂起情况。</p>
-<p>几个相关事件：</p>
-<ul>
-<li><code>jdk.VirtualThreadStart</code>：记录虚拟线程启动，默认关闭。</li>
-<li><code>jdk.VirtualThreadEnd</code>：记录虚拟线程结束，默认关闭。</li>
-<li><code>jdk.VirtualThreadPinned</code>：虚拟线程绑定在平台线程上时，如果阻塞超过阈值，会产生这个事件，默认开启。</li>
-<li><code>jdk.VirtualThreadSubmitFailed</code>：启动或唤醒虚拟线程失败，默认开启。</li>
-</ul>
-<p>官方说明：</p>
-<p><a href="https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR">https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR</a></p>
-<h3 id="2-推荐：JFR-EventStream"><a href="#2-推荐：JFR-EventStream" class="headerlink" title="2. 推荐：JFR EventStream"></a>2. 推荐：JFR EventStream</h3><p>由于 <code>-Djdk.tracePinnedThreads</code> 本身也可能带来问题，因此 JFR 是我监控 pin 线程的首选方案。</p>
-<p>如果通过命令行方式使用 JFR，会有几个问题：</p>
-<ol>
-<li>dump 文件较大，获取监控数据不方便，难以一次获取长期分析数据。</li>
-<li>dump 文件需要上机器操作，比较麻烦。</li>
-<li>一次只能查看单机数据。</li>
-<li>自己解析 JFR 文件虽然也能做持续监控，但是会很麻烦。</li>
-</ol>
-<p>因此可以使用 JFR EventStream。JFR 的事件流是 JDK14 引入的特性：</p>
-<p><a href="https://openjdk.org/jeps/349">https://openjdk.org/jeps/349</a></p>
-<p>示例代码可以简化成这样：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordedEvent;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordingStream;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"><span class="keyword">import</span> java.util.logging.Logger;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">VirtualThreadJfrMonitor</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">Logger</span> <span class="variable">LOGGER</span> <span class="operator">=</span> Logger.getLogger(VirtualThreadJfrMonitor.class.getName());</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">VIRTUAL_THREAD_PINNED</span> <span class="operator">=</span> <span class="string">&quot;jdk.VirtualThreadPinned&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">JAVA_MONITOR_ENTER</span> <span class="operator">=</span> <span class="string">&quot;jdk.JavaMonitorEnter&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">init</span><span class="params">()</span> &#123;</span><br><span class="line">        Thread.ofVirtual().name(<span class="string">&quot;jfr-monitor&quot;</span>).start(VirtualThreadJfrMonitor::start);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">start</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> (<span class="type">var</span> <span class="variable">rs</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">RecordingStream</span>()) &#123;</span><br><span class="line">            rs.enable(VIRTUAL_THREAD_PINNED).withoutThreshold();</span><br><span class="line">            rs.enable(JAVA_MONITOR_ENTER).withThreshold(Duration.ofMillis(<span class="number">5</span>));</span><br><span class="line">            List.of(VIRTUAL_THREAD_PINNED, JAVA_MONITOR_ENTER)</span><br><span class="line">                    .forEach(name -&gt; rs.onEvent(name, event -&gt; doLog(event, name)));</span><br><span class="line">            rs.start();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doLog</span><span class="params">(RecordedEvent event, String eventName)</span> &#123;</span><br><span class="line">        <span class="type">var</span> <span class="variable">thread</span> <span class="operator">=</span> event.getThread();</span><br><span class="line">        LOGGER.warning(() -&gt; <span class="string">&quot;event=&quot;</span> + eventName</span><br><span class="line">                + <span class="string">&quot;, durationMs=&quot;</span> + event.getDuration().toMillis()</span><br><span class="line">                + <span class="string">&quot;, thread=&quot;</span> + (thread == <span class="literal">null</span> ? <span class="string">&quot;unknown&quot;</span> : thread.getJavaName())</span><br><span class="line">                + <span class="string">&quot;, virtual=&quot;</span> + (thread != <span class="literal">null</span> &amp;&amp; thread.isVirtual()));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这个事件的触发条件可以粗略理解为：虚拟线程在 pinned 情况下出现 park 操作，并且耗时超过事件阈值。</p>
-<p>当然，这样依然会有问题：</p>
-<ol>
-<li>在 JFR 启动之前，可能有一些 pin 事件已经发生了，例如一些类加载，会被忽略掉。</li>
-<li>JFR 的启动在 premain 之后，也就是说对于启动期间静态 agent premain 操作中的 pin 事件，我们也是不知道的。</li>
-</ol>
-<p>问题 1 可以通过 JVM 参数启动 JFR，随后 dump 启动期间的 JFR 记录来解决。或者自定义一个 agent，确保 JFR 监控在其他类加载之前启动。</p>
-<p>问题 2 暂时没什么好办法。</p>
-<h3 id="3-jdk-tracePinnedThreads-只能非生产使用"><a href="#3-jdk-tracePinnedThreads-只能非生产使用" class="headerlink" title="3. jdk.tracePinnedThreads 只能非生产使用"></a>3. <code>jdk.tracePinnedThreads</code> 只能非生产使用</h3><p>当线程固定在平台线程上阻塞时：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.tracePinnedThreads=full</span><br><span class="line">-Djdk.tracePinnedThreads=short</span><br></pre></td></tr></table></figure>
-
-<p><code>full</code> 会打印完整堆栈，并突出显示 native frame 和持有 monitor 的 frame。</p>
-<p><code>short</code> 只输出关键帧。</p>
-<p>这里要注意，这个参数在 JDK21 上存在过一些严重问题。例如：</p>
-<ul>
-<li><a href="https://bugs.openjdk.org/browse/JDK-8322846">https://bugs.openjdk.org/browse/JDK-8322846</a></li>
-<li><a href="https://bugs.openjdk.org/browse/JDK-8325521">https://bugs.openjdk.org/browse/JDK-8325521</a></li>
-</ul>
-<p>所以它适合上线前排查，不适合生产长期打开。</p>
-<h2 id="解决措施"><a href="#解决措施" class="headerlink" title="解决措施"></a>解决措施</h2><p>最好的解决方案是官方提供 <code>synchronized</code> 对虚拟线程的支持。JDK24 中已经实现了适配：</p>
-<p><a href="https://openjdk.org/jeps/491">https://openjdk.org/jeps/491</a></p>
-<p>如果当前运行时还是 JDK21，可以考虑：</p>
-<ol>
-<li>尽量从 <code>synchronized</code> 迁移到 <code>ReentrantLock</code>。</li>
-<li>不要在 <code>synchronized</code> 内做 IO、sleep、park、等待连接池。</li>
-<li>对于 <code>ConcurrentHashMap</code> 这类替换成本较高的场景，不要机械替换。</li>
-<li>由于 JFR event 并不包含持有 Monitor 的帧，所以上线前排查阶段使用 <code>-Djdk.tracePinnedThreads</code> 会比较方便，但只建议非生产使用。</li>
-</ol>
-<p>排查时重点关注：</p>
-<ol>
-<li>sync 块内外出现同一资源竞争，这种可能造成死锁。</li>
-<li>sync 里面有 park，但是没有内外资源竞争，这种主要影响性能。</li>
-<li>sync 里面没有 park 操作，无竞争时影响不大，有竞争时会导致性能变差，可以通过 JFR 事件 <code>jdk.JavaMonitorEnter</code> 观察。</li>
-<li>其他绑定问题，例如 native、FFI、类加载、agent。</li>
-</ol>
-<h2 id="Tips"><a href="#Tips" class="headerlink" title="Tips"></a>Tips</h2><p>虚拟线程不再需要池化。虚拟线程非常轻量，随用随建就行。</p>
-<p>但是线程池部分思想依然有效，例如使用线程池的思想控制访问资源的并发量。</p>
-<p>这种场景下，内部可以用 <code>Semaphore</code> 简单控制并发量，而不需要复杂的线程管理逻辑。</p>
-<p>也就是说，虚拟线程池的目的不再包含资源复用，而应该只包含一些更轻量的附加控制。</p>
-<h2 id="线程转储"><a href="#线程转储" class="headerlink" title="线程转储"></a>线程转储</h2><p>在 JDK21 中使用：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">jstack -l &lt;pid&gt; &gt; &lt;file&gt;</span><br></pre></td></tr></table></figure>
-
-<p>拿不到完整虚拟线程。</p>
-<p>IDEA 中的线程转储也不一定能获取到虚拟线程。</p>
-<p>原因：虚拟线程数量非常多，原本扁平化的数据结构无法很好地组织线程之间的结构关系，引入结构化并发后更是如此。</p>
-<p>方案是使用 JSON 结构输出包含虚拟线程的堆栈转储：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">jcmd &lt;pid&gt; Thread.dump_to_file -format=json &lt;file&gt;</span><br></pre></td></tr></table></figure>
-
-<p>新版 IDEA 对此也提供了一定支持：</p>
-<p><a href="https://youtrack.jetbrains.com/issue/IDEA-316211/Support-json-thread-dump-format-of-jcmd">https://youtrack.jetbrains.com/issue/IDEA-316211/Support-json-thread-dump-format-of-jcmd</a></p>
-<p>参考：</p>
-<p><a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html#GUID-8AEDDBE6-F783-4D77-8786-AC5A79F517C0">https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html#GUID-8AEDDBE6-F783-4D77-8786-AC5A79F517C0</a></p>
-]]></content>
-      <categories>
-        <category>Java</category>
-      </categories>
-      <tags>
-        <tag>Java</tag>
-        <tag>JDK21</tag>
-        <tag>JVM</tag>
-        <tag>Virtual Threads</tag>
-        <tag>Loom</tag>
         <tag>JFR</tag>
+        <tag>Leyden</tag>
+        <tag>AOT</tag>
       </tags>
   </entry>
   <entry>
@@ -905,179 +512,146 @@
       </tags>
   </entry>
   <entry>
-    <title>JDK25 与 Leyden 相关进展记录</title>
-    <url>/2024/10/05/05-jdk25-leyden-follow-up/</url>
-    <content><![CDATA[<p>这篇是 JDK21 升级之后继续关注的一些方向，主要包括 Loom、JVM、JFR、GC、对象头压缩，以及 Leyden。</p>
-<p>JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。</p>
+    <title>Loom 虚拟线程相关问题记录</title>
+    <url>/2024/09/05/03-virtual-threads-production-practice/</url>
+    <content><![CDATA[<p>JDK21 的虚拟线程目前存在许多严重问题，尽量不要在可靠性要求较高的服务中直接大规模使用。</p>
+<p>这篇基本是我当时整理 Loom 问题时的笔记。不是虚拟线程入门，也不是“开箱即用教程”，重点是风险、死锁、监控和适配。</p>
 <span id="more"></span>
 
-<h2 id="Loom（虚拟线程）"><a href="#Loom（虚拟线程）" class="headerlink" title="Loom（虚拟线程）"></a>Loom（虚拟线程）</h2><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a></td>
-<td>解决了虚拟线程在 <code>synchronized</code> 上绑定的问题。虚拟线程从此可以更大规模使用了，但类加载等场景依然需要关注。</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a></td>
-<td>引入一种全新的、基于显式作用域管理的值传递方式。</td>
-</tr>
-</tbody></table>
-<p>JDK21 里虚拟线程已经正式可用，但如果从生产大规模使用角度看，我认为 JDK24 的 JEP 491 非常关键。</p>
-<h2 id="JVM-相关"><a href="#JVM-相关" class="headerlink" title="JVM 相关"></a>JVM 相关</h2><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
-<td>完成 Lilliput 项目的第一阶段，将对象头从 128 位减小到 64 位，下一阶段目标是 32 位。对象很多的应用可能会有内存收益，具体效果和项目本身关系比较大。</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
-<td>Shenandoah 也进入分代方向。不过 JDK25 里默认仍是单代 Shenandoah。低延迟 GC 后面基本都在利用分代假说继续优化。</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
-<td>支持对指定方法做更精确的耗时统计和 tracing。这个对线上分析很有吸引力，但生产开启范围和开销要认真控制。</td>
-</tr>
-<tr>
-<td>23 / 24</td>
-<td><a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> / <a href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
-<td>ZGC 后续只有分代模式了。实测我认为绝大部分情况下分代 ZGC 优于单代 ZGC，少部分不符合分代假说的极端情况除外。</td>
-</tr>
-</tbody></table>
-<h2 id="语法-amp-core-lib"><a href="#语法-amp-core-lib" class="headerlink" title="语法 &amp; core-lib"></a>语法 &amp; core-lib</h2><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/485">JEP 485: Stream Gatherers</a></td>
-<td>提供更灵活的 stream 流处理方式，并且提供了一些内置扩展。</td>
-</tr>
-<tr>
-<td>22</td>
-<td><a href="https://openjdk.org/jeps/456">JEP 456: Unnamed Variables &amp; Patterns</a></td>
-<td>可以使用下划线 <code>_</code> 来命名未使用的变量。</td>
-</tr>
-<tr>
-<td>23</td>
-<td><a href="https://openjdk.org/jeps/467">JEP 467: Markdown Documentation Comments</a></td>
-<td>注释支持 Markdown 格式。</td>
-</tr>
-</tbody></table>
-<h2 id="底层库"><a href="#底层库" class="headerlink" title="底层库"></a>底层库</h2><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>22</td>
-<td><a href="https://openjdk.org/jeps/454">JEP 454: Foreign Function &amp; Memory API</a></td>
-<td>提供标准 FFM API，用于调用其他语言代码以及本地内存管理。</td>
-</tr>
-<tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/484">JEP 484: Class-File API</a></td>
-<td>提供用于解析、生成和转换 Java 类文件的标准 API。</td>
-</tr>
-</tbody></table>
-<h2 id="Leyden-相关"><a href="#Leyden-相关" class="headerlink" title="Leyden 相关"></a>Leyden 相关</h2><h3 id="DONE"><a href="#DONE" class="headerlink" title="DONE"></a>DONE</h3><ul>
-<li><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></li>
-<li><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></li>
-<li><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></li>
-<li><a href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></li>
-</ul>
-<p>这里和我最初整理时有一个变化：JEP 516 已经是 JDK26 delivered，不再是 doing 状态。所以如果只讨论 JDK25，需要把它放到“后续继续关注”的位置；如果讨论 Leyden 路线，就可以一起看。</p>
-<h3 id="DOING-继续关注"><a href="#DOING-继续关注" class="headerlink" title="DOING / 继续关注"></a>DOING / 继续关注</h3><ul>
-<li>AOT Code Compilation 相关草案。</li>
-<li>对更多 class loader 场景的支持。</li>
-<li>和 Spring Boot 打包、jar 展开、CDS 的工程化结合。</li>
-<li>启动参数、训练流程和正式启动流程的隔离。</li>
-</ul>
-<h2 id="核心-JEP-解读"><a href="#核心-JEP-解读" class="headerlink" title="核心 JEP 解读"></a>核心 JEP 解读</h2><h3 id="JEP-483"><a href="#JEP-483" class="headerlink" title="JEP 483"></a>JEP 483</h3><p><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
-<p>存储类加载和链接的训练数据。它关注的是应用启动时反复做的类加载、解析、链接工作，能不能提前做一部分。</p>
-<p>tips：</p>
-<p>对 lambda 等的优化会比较大。</p>
-<p>需要注意的是，它不是把 Java 变成 native 可执行文件，也不是直接消除 JVM 动态性。它更像是让 JVM 在启动时少做一部分重复工作。</p>
-<h3 id="JEP-515"><a href="#JEP-515" class="headerlink" title="JEP 515"></a>JEP 515</h3><p><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
-<p>存储方法调用数据，例如方法执行次数等，以便 JIT 了解方法执行情况，可以直接进行对应层级的编译优化。</p>
-<p>tips：</p>
-<p>这样做需要注意，由于 JIT 已知方法执行情况，理想情况下可以认为热点 path 代码可以在首次触达时即完成 JIT 优化。这对 CPU 资源的开销可能会比较大。</p>
-<p>也就是说，如果直接接入峰值流量，启动初期消耗的 CPU 资源可能较高，可能依然需要慢启动流程。不过流量放大的速度可以比现在快很多。</p>
-<p>未来 AOT Code Compilation 完成后，上述问题可能会继续改善。</p>
-<h3 id="JEP-514"><a href="#JEP-514" class="headerlink" title="JEP 514"></a>JEP 514</h3><p><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></p>
-<p>作用是改善 AOT 命令行体验，把训练和生成配置的流程包装得顺一点。</p>
-<p>这个 JEP 本身不算最核心的性能能力，但对工程化很重要。AOT 相关能力如果使用成本太高，就很难真正进入普通服务发布流程。</p>
-<p>目前需要注意的是：生成训练数据时的启动参数和正式启动应用时不应该简单完全复用。例如管理端口、监控端口、临时目录、文件路径，都可能在训练生成阶段产生冲突。</p>
-<h3 id="JEP-516"><a href="#JEP-516" class="headerlink" title="JEP 516"></a>JEP 516</h3><p><a href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></p>
-<p>JEP 516 是 JDK26 的内容，不属于 JDK25，但它很能说明 Leyden 的方向：不只是类加载和链接，后续还会把一些对象状态提前缓存。</p>
-<p>这个方向对启动和预热会有更大帮助。但具体到业务应用收益、和应用框架如何结合、训练数据如何设计，仍然需要继续观察。</p>
-<h2 id="目前最大的问题"><a href="#目前最大的问题" class="headerlink" title="目前最大的问题"></a>目前最大的问题</h2><h3 id="class-loader"><a href="#class-loader" class="headerlink" title="class loader"></a>class loader</h3><p>Leyden 相关能力很容易受 class loader 影响。</p>
-<p>简单 classpath 应用是一回事，真实服务经常还有：</p>
+<h2 id="简单介绍"><a href="#简单介绍" class="headerlink" title="简单介绍"></a>简单介绍</h2><p>虚拟线程使用一个专用的、FIFO 模式下的 ForkJoin 线程池。<code>parallelStream</code> 使用的是公共 ForkJoinPool，模式不一样。</p>
+<p>它的并行度就是承载虚拟线程的平台线程数，默认与可用核心数相等，也可以使用参数调整：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.virtualThreadScheduler.parallelism=&lt;n&gt;</span><br></pre></td></tr></table></figure>
+
+<p>虚拟线程的核心价值是：阻塞时可以从平台线程上卸载，让平台线程继续执行其他虚拟线程。所以它适合 IO 密集型场景，而不是 CPU 密集型场景。</p>
+<h2 id="推荐资料"><a href="#推荐资料" class="headerlink" title="推荐资料"></a>推荐资料</h2><p>以下资料主要是对 Java 虚拟线程的设计和思考，具体实现以 JDK 为准：</p>
 <ul>
-<li>fat jar / nested jar。</li>
-<li>应用服务器 class loader。</li>
-<li>插件化 class loader。</li>
-<li>框架自定义 class loader。</li>
-<li>agent 或字节码增强。</li>
+<li><a href="https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html">https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html</a></li>
+<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html</a></li>
+<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html</a></li>
+<li><a href="https://inside.java/2021/05/10/networking-io-with-virtual-threads/">https://inside.java/2021/05/10/networking-io-with-virtual-threads/</a></li>
+<li><a href="https://inside.java/2020/08/07/loom-performance/">https://inside.java/2020/08/07/loom-performance/</a></li>
+<li><a href="https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads">https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads</a></li>
+<li><a href="https://inside.java/2023/08/26/continuations-under-the-covers/">https://inside.java/2023/08/26/continuations-under-the-covers/</a></li>
 </ul>
-<p>所以不要只看简单 demo 的效果。真实服务要看自己的打包方式和类加载路径。</p>
-<p>Spring Boot 这类框架已经在 jar 展开、CDS、AOT 方向做了一些工作，普通服务优先看框架集成会更稳。</p>
-<p>相关资料：</p>
-<ul>
-<li><a href="https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation">https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation</a></li>
-<li><a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></li>
-<li><a href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></li>
-</ul>
-<h3 id="GC-支持"><a href="#GC-支持" class="headerlink" title="GC 支持"></a>GC 支持</h3><p>早期 Leyden/AOT 能力和 GC 的配合有一些限制，后续 JEP 516 已经推进到 Any GC。</p>
-<p>对业务应用来说，比较理想的状态是：不需要为了启动优化放弃原本选择的 GC。</p>
-<h3 id="训练流量"><a href="#训练流量" class="headerlink" title="训练流量"></a>训练流量</h3><p>AOT profile 类能力依赖训练数据。训练数据是否代表真实流量，会直接影响收益。</p>
-<p>如果训练流量和真实流量差异很大，可能只优化了启动路径，没优化真正的业务热点路径。对复杂服务来说，训练阶段如何设计是一个工程问题，不只是 JVM 参数问题。</p>
-<h2 id="Leyden-和-Native-Image-的区别"><a href="#Leyden-和-Native-Image-的区别" class="headerlink" title="Leyden 和 Native Image 的区别"></a>Leyden 和 Native Image 的区别</h2><p>Leyden 相比 Native Image 而言，不会砍掉 JVM 的动态性。对开发而言可以做到基本无感。</p>
-<p>Leyden 项目不打算直接合并 GraalVM 的工作，而是参考一部分 Graal 思路的同时，在项目开始时保留一部分运行时特征。</p>
-<p>相关背景：</p>
-<ul>
-<li><a href="https://www.infoq.com/news/2022/06/project-leyden-delays-aot/">https://www.infoq.com/news/2022/06/project-leyden-delays-aot/</a></li>
-<li><a href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></li>
-<li><a href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></li>
-<li><a href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></li>
-</ul>
-<p>我的理解是：</p>
-<ul>
-<li>Native Image 更激进，收益明显，约束也明显。</li>
-<li>Leyden 更温和，更适合大量依赖 JVM 动态性的传统 Java 服务。</li>
-</ul>
-<h2 id="需要关注的工作"><a href="#需要关注的工作" class="headerlink" title="需要关注的工作"></a>需要关注的工作</h2><ol>
-<li>JEP 491 后，虚拟线程在真实服务里的风险是否明显降低。</li>
-<li>JFR Method Timing &amp; Tracing 的生产使用方式和开销。</li>
-<li>Compact Object Headers 对对象密集型服务的实际内存收益。</li>
-<li>ZGC/Shenandoah 分代化之后的真实吞吐和延迟表现。</li>
-<li>Leyden 和 Spring Boot、CDS、jar 展开的集成路径。</li>
-<li>AOT profile/缓存能力对启动、预热、扩容速度的改善。</li>
+<p>如果对异步发展史感兴趣，可以看 Devoxx 相关分享：从线程到响应式，再到虚拟线程。</p>
+<h2 id="风险"><a href="#风险" class="headerlink" title="风险"></a>风险</h2><p>虚拟线程支持 ThreadLocal 和 <code>synchronized</code>，但是存在一些缺陷，有一些问题需要额外注意。</p>
+<h3 id="1-绑定问题"><a href="#1-绑定问题" class="headerlink" title="1. 绑定问题"></a>1. 绑定问题</h3><ol>
+<li><p>虚拟线程执行时，在 <code>synchronized</code> 块或方法中执行代码，会与平台线程绑定。同步块内，以及等待同步锁都会 pin。因此 JDK21 里需要尽量使用 <code>ReentrantLock</code> 替代。这个问题在 JDK24 的 <a href="https://openjdk.org/jeps/491">JEP 491</a> 里已经从底层解决了一大块。</p>
+</li>
+<li><p>虚拟线程执行 native 代码或外来函数时是无法被中止的。这个暂时无法完全从底层解决，典型场景之一是类初始化。</p>
+</li>
 </ol>
-<p>JDK21 升级完以后，不代表这条线结束。JDK21 是一个适合落地的版本；JDK24/JDK25/JDK26 展示的是后续演进方向。</p>
+<h3 id="2-死锁：这块风险在-JEP-中实际上被低估了"><a href="#2-死锁：这块风险在-JEP-中实际上被低估了" class="headerlink" title="2. 死锁：这块风险在 JEP 中实际上被低估了"></a>2. 死锁：这块风险在 JEP 中实际上被低估了</h3><p>最经典的场景，大部分死锁本质都是这类问题：<code>synchronized</code> 内外出现同一资源竞争。</p>
+<p>相关讨论：</p>
+<ul>
+<li><a href="https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/">https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/</a></li>
+<li><a href="https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html">https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html</a></li>
+<li><a href="https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html">https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html</a></li>
+</ul>
+<p>复现代码可以简化成这样：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">10</span>; i++) &#123;</span><br><span class="line">    Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">        System.out.println(Thread.currentThread() + <span class="string">&quot;: Before synchronized block&quot;</span>);</span><br><span class="line">        <span class="keyword">synchronized</span> (Main.class) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread() + <span class="string">&quot;: Inside synchronized block&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>更接近真实问题的代码可以简化为：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">1</span>; i++) &#123;</span><br><span class="line">    Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">        doSomethingWithLock();</span><br><span class="line">        <span class="keyword">synchronized</span> (Main.class) &#123;</span><br><span class="line">            doSomethingWithLock();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doSomethingWithLock</span><span class="params">()</span> &#123;</span><br><span class="line">    lock.lock();</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="comment">// do something</span></span><br><span class="line">    &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">        lock.unlock();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>大体原理是：</p>
+<p>Lock 内部实现的 AQS 使用 FIFO 队列来进行线程排队和资源抢占。对于已经在队列中的线程来说，无论是公平锁还是非公平锁，都遵循 FIFO。</p>
+<p>死锁场景是：FIFO 队列中，一个阻塞在同步块外部 lock 上的虚拟线程排在前面，一个阻塞在同步块内部 lock 上的虚拟线程排在后面。当某个线程释放 lock 时，会把队列前面的虚拟线程 unpark，然后自身马上停靠在 <code>synchronized</code> 同步块上被绑定。</p>
+<p>此时其他虚拟线程都在 pinned 状态，占用了所有平台线程。这个 unpark 是无效的，因为被唤醒的虚拟线程没有平台线程可以绑定，也就无法继续抢锁；而真正能推进状态的线程又排在队列后面，最终卡住。</p>
+<p>如果摒弃 <code>ReentrantLock</code> 的影响，实际状态可以简化为类似下面的代码。这个例子需要只有一个载体线程：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.virtualThreadScheduler.parallelism=1</span><br><span class="line">--add-opens java.base/jdk.internal.misc=ALL-UNNAMED</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.internal.misc.VirtualThreads;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestThreadDeadLock</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> <span class="type">int</span> <span class="variable">vt1state</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> <span class="type">int</span> <span class="variable">vt2state</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">        <span class="type">Thread</span> <span class="variable">vt1</span> <span class="operator">=</span> Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">            VirtualThreads.park();</span><br><span class="line">            vt1state++;</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (!Thread.State.WAITING.equals(vt1.getState())) &#123;</span><br><span class="line">            Thread.onSpinWait();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">            VirtualThreads.unpark(vt1);</span><br><span class="line">            syncPark();</span><br><span class="line">            vt2state++;</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">            Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;vt1state:&quot;</span> + vt1state + <span class="string">&quot; vt2state: &quot;</span> + vt2state);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title function_">syncPark</span><span class="params">()</span> &#123;</span><br><span class="line">        VirtualThreads.park();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行后 <code>vt1</code> 被 unpark 也无法执行到 <code>vt1state++</code>。</p>
+<h3 id="3-Native-或-FFI-导致的死锁"><a href="#3-Native-或-FFI-导致的死锁" class="headerlink" title="3. Native 或 FFI 导致的死锁"></a>3. Native 或 FFI 导致的死锁</h3><p>这个可能比较难发生，但是与同步块的死锁同理。</p>
+<p>例如在类加载内与类加载外存在 <code>ReentrantLock</code>，或者其他资源抢占，就可能发生。</p>
+<h3 id="4-平台线程资源耗尽"><a href="#4-平台线程资源耗尽" class="headerlink" title="4. 平台线程资源耗尽"></a>4. 平台线程资源耗尽</h3><p>这个问题源于线程 pinning，需要注意：</p>
+<ul>
+<li><a href="https://blog.ydb.tech/how-we-switched-to-java-21-virtual-threads-and-got-deadlock-in-tpc-c-for-postgresql-cca2fe08d70b">https://blog.ydb.tech/how-we-switched-to-java-21-virtual-threads-and-got-deadlock-in-tpc-c-for-postgresql-cca2fe08d70b</a></li>
+<li><a href="https://news.ycombinator.com/item?id=39008026">https://news.ycombinator.com/item?id=39008026</a></li>
+</ul>
+<h2 id="ThreadLocal"><a href="#ThreadLocal" class="headerlink" title="ThreadLocal"></a>ThreadLocal</h2><p>ThreadLocal 的问题主要在于线程模型变化。</p>
+<p>没有虚拟线程前，我们可以假定线程数不会太多。但是虚拟线程打破了这个限制，一个系统可能同时存在非常多虚拟线程。</p>
+<p>因此 ThreadLocal 的数据量就可能非常非常多，这也就是 ThreadLocal 的风险所在。用的时候注意一下就好。</p>
+<p>这里 cue 一下 ScopedValue。有些人可能期望使用 ScopedValue 完全替代 ThreadLocal，其实这是不现实的。</p>
+<p>最典型的是 ThreadLocal 用于资源池化的场景，例如 Jackson 和 Log4j2 中都有这种用法。Log4j2 的 ReusableMessage 后来也老实换成普通资源池了：</p>
+<p><a href="https://github.com/apache/logging-log4j2/pull/1401">https://github.com/apache/logging-log4j2/pull/1401</a></p>
+<h2 id="监控"><a href="#监控" class="headerlink" title="监控"></a>监控</h2><h3 id="1-JFR"><a href="#1-JFR" class="headerlink" title="1. JFR"></a>1. JFR</h3><p>可以使用 JFR 来观察虚拟线程在绑定时的挂起情况。</p>
+<p>几个相关事件：</p>
+<ul>
+<li><code>jdk.VirtualThreadStart</code>：记录虚拟线程启动，默认关闭。</li>
+<li><code>jdk.VirtualThreadEnd</code>：记录虚拟线程结束，默认关闭。</li>
+<li><code>jdk.VirtualThreadPinned</code>：虚拟线程绑定在平台线程上时，如果阻塞超过阈值，会产生这个事件，默认开启。</li>
+<li><code>jdk.VirtualThreadSubmitFailed</code>：启动或唤醒虚拟线程失败，默认开启。</li>
+</ul>
+<p>官方说明：</p>
+<p><a href="https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR">https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR</a></p>
+<h3 id="2-推荐：JFR-EventStream"><a href="#2-推荐：JFR-EventStream" class="headerlink" title="2. 推荐：JFR EventStream"></a>2. 推荐：JFR EventStream</h3><p>由于 <code>-Djdk.tracePinnedThreads</code> 本身也可能带来问题，因此 JFR 是我监控 pin 线程的首选方案。</p>
+<p>如果通过命令行方式使用 JFR，会有几个问题：</p>
+<ol>
+<li>dump 文件较大，获取监控数据不方便，难以一次获取长期分析数据。</li>
+<li>dump 文件需要上机器操作，比较麻烦。</li>
+<li>一次只能查看单机数据。</li>
+<li>自己解析 JFR 文件虽然也能做持续监控，但是会很麻烦。</li>
+</ol>
+<p>因此可以使用 JFR EventStream。JFR 的事件流是 JDK14 引入的特性：</p>
+<p><a href="https://openjdk.org/jeps/349">https://openjdk.org/jeps/349</a></p>
+<p>示例代码可以简化成这样：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordedEvent;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordingStream;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"><span class="keyword">import</span> java.util.logging.Logger;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">VirtualThreadJfrMonitor</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">Logger</span> <span class="variable">LOGGER</span> <span class="operator">=</span> Logger.getLogger(VirtualThreadJfrMonitor.class.getName());</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">VIRTUAL_THREAD_PINNED</span> <span class="operator">=</span> <span class="string">&quot;jdk.VirtualThreadPinned&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">JAVA_MONITOR_ENTER</span> <span class="operator">=</span> <span class="string">&quot;jdk.JavaMonitorEnter&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">init</span><span class="params">()</span> &#123;</span><br><span class="line">        Thread.ofVirtual().name(<span class="string">&quot;jfr-monitor&quot;</span>).start(VirtualThreadJfrMonitor::start);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">start</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> (<span class="type">var</span> <span class="variable">rs</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">RecordingStream</span>()) &#123;</span><br><span class="line">            rs.enable(VIRTUAL_THREAD_PINNED).withoutThreshold();</span><br><span class="line">            rs.enable(JAVA_MONITOR_ENTER).withThreshold(Duration.ofMillis(<span class="number">5</span>));</span><br><span class="line">            List.of(VIRTUAL_THREAD_PINNED, JAVA_MONITOR_ENTER)</span><br><span class="line">                    .forEach(name -&gt; rs.onEvent(name, event -&gt; doLog(event, name)));</span><br><span class="line">            rs.start();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doLog</span><span class="params">(RecordedEvent event, String eventName)</span> &#123;</span><br><span class="line">        <span class="type">var</span> <span class="variable">thread</span> <span class="operator">=</span> event.getThread();</span><br><span class="line">        LOGGER.warning(() -&gt; <span class="string">&quot;event=&quot;</span> + eventName</span><br><span class="line">                + <span class="string">&quot;, durationMs=&quot;</span> + event.getDuration().toMillis()</span><br><span class="line">                + <span class="string">&quot;, thread=&quot;</span> + (thread == <span class="literal">null</span> ? <span class="string">&quot;unknown&quot;</span> : thread.getJavaName())</span><br><span class="line">                + <span class="string">&quot;, virtual=&quot;</span> + (thread != <span class="literal">null</span> &amp;&amp; thread.isVirtual()));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个事件的触发条件可以粗略理解为：虚拟线程在 pinned 情况下出现 park 操作，并且耗时超过事件阈值。</p>
+<p>当然，这样依然会有问题：</p>
+<ol>
+<li>在 JFR 启动之前，可能有一些 pin 事件已经发生了，例如一些类加载，会被忽略掉。</li>
+<li>JFR 的启动在 premain 之后，也就是说对于启动期间静态 agent premain 操作中的 pin 事件，我们也是不知道的。</li>
+</ol>
+<p>问题 1 可以通过 JVM 参数启动 JFR，随后 dump 启动期间的 JFR 记录来解决。或者自定义一个 agent，确保 JFR 监控在其他类加载之前启动。</p>
+<p>问题 2 暂时没什么好办法。</p>
+<h3 id="3-jdk-tracePinnedThreads-只能非生产使用"><a href="#3-jdk-tracePinnedThreads-只能非生产使用" class="headerlink" title="3. jdk.tracePinnedThreads 只能非生产使用"></a>3. <code>jdk.tracePinnedThreads</code> 只能非生产使用</h3><p>当线程固定在平台线程上阻塞时：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.tracePinnedThreads=full</span><br><span class="line">-Djdk.tracePinnedThreads=short</span><br></pre></td></tr></table></figure>
+
+<p><code>full</code> 会打印完整堆栈，并突出显示 native frame 和持有 monitor 的 frame。</p>
+<p><code>short</code> 只输出关键帧。</p>
+<p>这里要注意，这个参数在 JDK21 上存在过一些严重问题。例如：</p>
+<ul>
+<li><a href="https://bugs.openjdk.org/browse/JDK-8322846">https://bugs.openjdk.org/browse/JDK-8322846</a></li>
+<li><a href="https://bugs.openjdk.org/browse/JDK-8325521">https://bugs.openjdk.org/browse/JDK-8325521</a></li>
+</ul>
+<p>所以它适合上线前排查，不适合生产长期打开。</p>
+<h2 id="解决措施"><a href="#解决措施" class="headerlink" title="解决措施"></a>解决措施</h2><p>最好的解决方案是官方提供 <code>synchronized</code> 对虚拟线程的支持。JDK24 中已经实现了适配：</p>
+<p><a href="https://openjdk.org/jeps/491">https://openjdk.org/jeps/491</a></p>
+<p>如果当前运行时还是 JDK21，可以考虑：</p>
+<ol>
+<li>尽量从 <code>synchronized</code> 迁移到 <code>ReentrantLock</code>。</li>
+<li>不要在 <code>synchronized</code> 内做 IO、sleep、park、等待连接池。</li>
+<li>对于 <code>ConcurrentHashMap</code> 这类替换成本较高的场景，不要机械替换。</li>
+<li>由于 JFR event 并不包含持有 Monitor 的帧，所以上线前排查阶段使用 <code>-Djdk.tracePinnedThreads</code> 会比较方便，但只建议非生产使用。</li>
+</ol>
+<p>排查时重点关注：</p>
+<ol>
+<li>sync 块内外出现同一资源竞争，这种可能造成死锁。</li>
+<li>sync 里面有 park，但是没有内外资源竞争，这种主要影响性能。</li>
+<li>sync 里面没有 park 操作，无竞争时影响不大，有竞争时会导致性能变差，可以通过 JFR 事件 <code>jdk.JavaMonitorEnter</code> 观察。</li>
+<li>其他绑定问题，例如 native、FFI、类加载、agent。</li>
+</ol>
+<h2 id="Tips"><a href="#Tips" class="headerlink" title="Tips"></a>Tips</h2><p>虚拟线程不再需要池化。虚拟线程非常轻量，随用随建就行。</p>
+<p>但是线程池部分思想依然有效，例如使用线程池的思想控制访问资源的并发量。</p>
+<p>这种场景下，内部可以用 <code>Semaphore</code> 简单控制并发量，而不需要复杂的线程管理逻辑。</p>
+<p>也就是说，虚拟线程池的目的不再包含资源复用，而应该只包含一些更轻量的附加控制。</p>
+<h2 id="线程转储"><a href="#线程转储" class="headerlink" title="线程转储"></a>线程转储</h2><p>在 JDK21 中使用：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">jstack -l &lt;pid&gt; &gt; &lt;file&gt;</span><br></pre></td></tr></table></figure>
+
+<p>拿不到完整虚拟线程。</p>
+<p>IDEA 中的线程转储也不一定能获取到虚拟线程。</p>
+<p>原因：虚拟线程数量非常多，原本扁平化的数据结构无法很好地组织线程之间的结构关系，引入结构化并发后更是如此。</p>
+<p>方案是使用 JSON 结构输出包含虚拟线程的堆栈转储：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">jcmd &lt;pid&gt; Thread.dump_to_file -format=json &lt;file&gt;</span><br></pre></td></tr></table></figure>
+
+<p>新版 IDEA 对此也提供了一定支持：</p>
+<p><a href="https://youtrack.jetbrains.com/issue/IDEA-316211/Support-json-thread-dump-format-of-jcmd">https://youtrack.jetbrains.com/issue/IDEA-316211/Support-json-thread-dump-format-of-jcmd</a></p>
+<p>参考：</p>
+<p><a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html#GUID-8AEDDBE6-F783-4D77-8786-AC5A79F517C0">https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html#GUID-8AEDDBE6-F783-4D77-8786-AC5A79F517C0</a></p>
 ]]></content>
       <categories>
         <category>Java</category>
@@ -1086,49 +660,435 @@
         <tag>Java</tag>
         <tag>JDK21</tag>
         <tag>JVM</tag>
+        <tag>Virtual Threads</tag>
+        <tag>Loom</tag>
         <tag>JFR</tag>
-        <tag>Leyden</tag>
-        <tag>AOT</tag>
       </tags>
   </entry>
   <entry>
-    <title>MVCC与覆盖索引</title>
-    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
-    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
+    <title>JDK8 到 JDK21 重要特性梳理</title>
+    <url>/2024/08/18/02-jdk21-feature-selection/</url>
+    <content><![CDATA[<p>注意：预览功能非必要不建议使用。</p>
+<p>以下表格去除了大部分日常开发不需要感知的特性，按照个人理解根据重要性、影响程度，以及日常开发需要关注的程度进行排序。会比较主观，欢迎补充和指正。</p>
 <span id="more"></span>
 
-<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
-<p>参考资料</p>
-<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
-<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
-<p>《Innodb存储引擎》</p>
-</blockquote>
-<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
-<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
-<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
-<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
-<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
-<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
-<p><strong>所以</strong></p>
-<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
-<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<p>所以覆盖索引不是总不需要回表的。</p>
-<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
-<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
-<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
-<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
-<p>个人认为这是一种效率与空间之间的权衡。</p>
-</li>
+<p>参考入口：</p>
+<ul>
+<li><a href="https://openjdk.org/jeps/0">https://openjdk.org/jeps/0</a></li>
+<li><a href="https://openjdk.org/projects/jdk/17/jeps-since-jdk-11">https://openjdk.org/projects/jdk/17/jeps-since-jdk-11</a></li>
+<li><a href="https://openjdk.org/projects/jdk/21/jeps-since-jdk-17">https://openjdk.org/projects/jdk/21/jeps-since-jdk-17</a></li>
+<li><a href="https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html">https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html</a></li>
+<li><a href="https://github.com/nipafx/demo-java-x">https://github.com/nipafx/demo-java-x</a></li>
 </ul>
+<h2 id="1-语言"><a href="#1-语言" class="headerlink" title="1. 语言"></a>1. 语言</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>Description</th>
+<th>Project &amp; Tags</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/395">JEP 395: Records</a></td>
+<td>16</td>
+<td>充当不可变数据的载体的类，与元组形式类似，拥有极简单的类结构。有一些序列化相关特性需要注意。</td>
+<td>Amber - language</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/430">JEP 430: String Templates (Preview)</a></td>
+<td>21</td>
+<td>提供字符串模板和嵌入表达式生成字符串的方式。这个方向很有意思，但后来打算重做，这也是我不建议开启预览功能的原因之一。</td>
+<td>Amber - language、performance</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> / <a href="https://openjdk.org/jeps/394">JEP 394</a> / <a href="https://openjdk.org/jeps/440">JEP 440</a> / <a href="https://openjdk.org/jeps/441">JEP 441</a></td>
+<td>14 / 16 / 21 / 21</td>
+<td>对 switch 表达式、instanceof 类型转换、Record 模式匹配都做了简化。嵌套 Record 的场景会比较明显。</td>
+<td>Amber - language</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a></td>
+<td>10</td>
+<td><code>var</code> 可以用，但我建议只在特定情境下使用：不关心具体类型，或者可以在上下文中明确直接看到类型信息。比如 Stream 里某些很长的泛型类型。</td>
+<td>Amber - language</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a></td>
+<td>15</td>
+<td>可以使用三个双引号包含多行字符串。写 SQL、JSON、测试数据会舒服很多。</td>
+<td>Amber - language</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a></td>
+<td>17</td>
+<td>密封类，可以限制哪些其他类或接口可以继承或实现它们。</td>
+<td>Amber - specification</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a></td>
+<td>21</td>
+<td>提供了一套有序集合接口标准。不是大特性，但补上了集合框架里长期不太顺手的一块。</td>
+<td>Amber - specification</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/309">JEP 309: Dynamic Class-File Constants</a></td>
+<td>11</td>
+<td>提供类似 invokedynamic 的常量创建形式，一种使用场景是通过这种方式实现高性能懒加载单例。</td>
+<td>Valhalla</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/443">JEP 443: Unnamed Patterns and Variables (Preview)</a></td>
+<td>21</td>
+<td>对于没有用的变量可以用 <code>_</code> 代替命名表示省略。JDK21 中仍然是 Preview。</td>
+<td>Amber - language</td>
+</tr>
+</tbody></table>
+<p>语言特性我个人最容易用起来的是 Records、Text Blocks、switch/pattern matching、Sequenced Collections。Preview 功能可以看，但不建议作为生产主链路基础。</p>
+<h2 id="2-JVM-amp-Compiler"><a href="#2-JVM-amp-Compiler" class="headerlink" title="2. JVM &amp; Compiler"></a>2. JVM &amp; Compiler</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/377">ZGC(JEP377)</a> &amp; <a href="https://openjdk.org/jeps/379">Shenandoah(JEP379)</a></td>
+<td>15</td>
+<td>ZGC 和 Shenandoah 发布了生产版本。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a></td>
+<td>21</td>
+<td>ZGC 支持分代了，提升很大，但是需要充分压测。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/328">JEP 328: Flight Recorder</a></td>
+<td>11</td>
+<td>绝对的神器，已经 backport 到 jdk8u262，现在不少 JDK8 服务也可以用。JDK 升级、GC 选型、虚拟线程灰度都应该用 JFR 看证据。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/307">JEP 307: Parallel Full GC for G1</a></td>
+<td>10</td>
+<td>我原始笔记里写过“G1 支持并发 fullgc”，更准确地说是 G1 Full GC 并行化。16GB 堆在一些场景下也可以压到秒级以内。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/158">JEP 158: Unified JVM Logging</a> / <a href="https://openjdk.org/jeps/271">JEP 271: Unified GC Logging</a></td>
+<td>9</td>
+<td>规范化了虚拟机日志和 GC 日志，升级时旧 GC 日志参数要迁移到 <code>-Xlog</code>。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/345">JEP 345: NUMA-Aware Memory Allocation for G1</a></td>
+<td>14</td>
+<td>支持对 NUMA 架构的感知，特定场景下有意义。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/280">JEP 280: Indify String Concatenation</a></td>
+<td>9</td>
+<td>编译时通过 invokedynamic 实现字符串拼接，以前是 StringBuilder，也为多语言铺路。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/312">JEP 312: Thread-Local Handshakes</a></td>
+<td>10</td>
+<td>线程局部握手，某些 VM 操作不用总等全局安全点。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/451">JEP 451: Prepare to Disallow the Dynamic Loading of Agents</a></td>
+<td>21</td>
+<td>JDK 准备在将来的版本中默认禁止对正在运行的 JVM 动态加载 agent。监控、诊断、热修复相关工具都要提前验证。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/346">JEP 346: Promptly Return Unused Committed Memory from G1</a></td>
+<td>12</td>
+<td>G1 会更好地返还内存给操作系统，但不一定对所有业务有感知。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/344">JEP 344: Abortable Mixed Collections for G1</a></td>
+<td>12</td>
+<td>G1 能够通过划分必须回收区域、非必需回收区域来更精确地控制 MixedGC 耗时。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/318">JEP 318: Epsilon: A No-Op Garbage Collector</a></td>
+<td>11</td>
+<td>无 GC 收集器，这玩意一般用不上，更多是实验和测试场景。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/416">JEP 416: Reimplement Core Reflection with Method Handles</a></td>
+<td>18</td>
+<td>使用 MethodHandles 重新实现反射。部分场景变快，部分场景变慢，主要目的是规范化。顺带一提，Java 明显想尽量减少 C 代码，替换成 Java 实现。</td>
+</tr>
+</tbody></table>
+<p>这部分才是 JDK 升级时更应该关注的地方。语言特性只是表面，运行时行为变化才决定上线风险。</p>
+<h2 id="3-Other"><a href="#3-Other" class="headerlink" title="3. Other"></a>3. Other</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>Description</th>
+<th>Project &amp; Tags</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a></td>
+<td>21</td>
+<td>唯一真神，虚拟线程。但 JDK21 上坑比较多，暂不适用于可靠性要求较高的生产环境直接大规模使用。</td>
+<td>Loom</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/446">JEP 446: Scoped Values (Preview)</a></td>
+<td>21</td>
+<td>能在许多场景下替代 ThreadLocal，但注意，它并不是为了完全取代 ThreadLocal，也取代不了所有用法。</td>
+<td>Loom</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/453">JEP 453: Structured Concurrency (Preview)</a></td>
+<td>21</td>
+<td>结构化并发提供任务组的结构化组织方式，和虚拟线程适配很好。JDK21 里还是 Preview。</td>
+<td>Loom</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/412">JEP 412: Foreign Function &amp; Memory API</a></td>
+<td>17</td>
+<td>Panama 对 JDK 的影响其实比 Loom 可能更大，只是对上层开发者的影响不及 Loom。JDK21 阶段仍在预览演进，后续 JDK22 才稳定。</td>
+<td>Panama</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/448">JEP 448: Vector API (Sixth Incubator)</a></td>
+<td>21</td>
+<td>支持 SIMD 向量化加速计算。对 JSON 解析、压缩、数值计算等基础库更有价值。</td>
+<td>Panama</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/358">JEP 358: Helpful NullPointerExceptions</a></td>
+<td>14</td>
+<td>能够更准确地提供空指针异常信息。</td>
+<td>-</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/321">JEP 321: HTTP Client API</a></td>
+<td>11</td>
+<td>JDK 提供了一套标准 HTTP Client API。</td>
+<td>-</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/349">JEP 349: JFR Event Streaming</a></td>
+<td>14</td>
+<td>JFR 事件流，可以实现持续线上监控。我对虚拟线程 pin 问题的监控就是基于这个方向做的。</td>
+<td>-</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/259">JEP 259: Stack-Walking API</a></td>
+<td>9</td>
+<td>在 StackWalker 之前只能通过 <code>getStackTrace</code> 获取完整线程堆栈，StackWalker 允许只处理需要的 StackFrame。诊断工具和框架比较有用。</td>
+<td>-</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/250">JEP 250</a> / <a href="https://openjdk.org/jeps/310">JEP 310</a> / <a href="https://openjdk.org/jeps/341">JEP 341</a> / <a href="https://openjdk.org/jeps/350">JEP 350</a></td>
+<td>9 / 10 / 12 / 13</td>
+<td>CDS/AppCDS，主要问题是需要提前构建好存档，有点麻烦。</td>
+<td>-</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/193">JEP 193: Variable Handles</a></td>
+<td>9</td>
+<td>通过 VarHandle 可以实现更细粒度的内存屏障控制，例如一些高性能缓存库会用。</td>
+<td>Code Tools</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/254">JEP 254: Compact Strings</a></td>
+<td>9</td>
+<td>String 底层从 char 变成 byte，内存占用可能减少，但特定场景下可能增加 CPU 开销。</td>
+<td>-</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/285">JEP 285: Spin-Wait Hints</a></td>
+<td>9</td>
+<td>自旋场景可以使用 <code>Thread.onSpinWait()</code> 给 CPU 提示。但注意它不是性能银弹，而且命中 C2 前基本等于啥也没干。</td>
+<td>-</td>
+</tr>
+</tbody></table>
+<h2 id="4-废弃和删除"><a href="#4-废弃和删除" class="headerlink" title="4. 废弃和删除"></a>4. 废弃和删除</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/374">JEP 374: Deprecate and Disable Biased Locking</a></td>
+<td>15</td>
+<td>偏向锁被废弃并默认关闭。大部分应用不用管，但老参数要清理。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/363">JEP 363: Remove the Concurrent Mark Sweep (CMS) Garbage Collector</a></td>
+<td>14</td>
+<td>CMS 移除了。还在用 CMS 参数的服务会直接启动失败。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/366">JEP 366: Deprecate the ParallelScavenge + SerialOld GC Combination</a></td>
+<td>14</td>
+<td>一些旧 GC 组合不再推荐。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/410">JEP 410: Remove the Experimental AOT and JIT Compiler</a></td>
+<td>17</td>
+<td>移除了实验性质的 AOT 和 Graal JIT。需要 AOT/JIT 相关能力的直接看 GraalVM 或后续 Leyden。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/214">JEP 214: Remove GC Combinations Deprecated in JDK 8</a></td>
+<td>9</td>
+<td>一些 JDK8 已废弃的 GC 组合被删除。</td>
+</tr>
+</tbody></table>
+<h2 id="5-JDK8-到-JDK21-升级时我会重点看什么"><a href="#5-JDK8-到-JDK21-升级时我会重点看什么" class="headerlink" title="5. JDK8 到 JDK21 升级时我会重点看什么"></a>5. JDK8 到 JDK21 升级时我会重点看什么</h2><ol>
+<li>GC 参数，尤其是 CMS、GC 日志、<code>-Xlog</code>。</li>
+<li>强封装，尤其是反射访问 JDK internals 的地方。</li>
+<li>agent 行为，尤其是动态 attach。</li>
+<li>JFR 是否能作为常态化观测手段。</li>
+<li>虚拟线程是否真的适合当前服务，不要只看宣传。</li>
+</ol>
+<p>结论还是那句话：JDK21 的价值不只是语法，真正影响生产升级的是运行时能力、观测能力和兼容性风险。</p>
 ]]></content>
       <categories>
-        <category>MySQL</category>
+        <category>Java</category>
       </categories>
       <tags>
-        <tag>MySQL</tag>
-        <tag>MVCC</tag>
-        <tag>索引</tag>
+        <tag>Java</tag>
+        <tag>JDK21</tag>
+        <tag>JVM</tag>
+        <tag>JEP</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>JDK21 升级适用指南</title>
+    <url>/2024/08/01/01-jdk21-upgrade-practice/</url>
+    <content><![CDATA[<p>当前升级 JDK 的动力实际上主要来自三项：ZGC、虚拟线程、衍生生态。</p>
+<p>以下对 JDK 高版本主要特性做一个总览分析。这里不写成“JDK21 新特性大全”，只记录我在实际升级时比较关心的收益、适用场景和风险。</p>
+<span id="more"></span>
+
+<h2 id="1-总体分析"><a href="#1-总体分析" class="headerlink" title="1. 总体分析"></a>1. 总体分析</h2><h3 id="ZGC"><a href="#ZGC" class="headerlink" title="ZGC"></a>ZGC</h3><p>优点：ZGC 基本消除了 GC 带来的延迟，并且对大对象有更好的处理。</p>
+<p>不足：ZGC 吞吐量比不上 G1。即便分代 ZGC 吞吐量有了很大提升，但与 G1 依然有一定差距。</p>
+<p>我的理解是，如果应用的问题主要是 GC pause 带来的长尾，ZGC 值得优先验证。如果应用本身更看重极限吞吐，或者 GC 本来就不是瓶颈，那就不要只因为“新”而切。</p>
+<h3 id="虚拟线程"><a href="#虚拟线程" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>优点：适用 IO 密集型应用。一方面可以提高系统性能，另一方面可以极大消除线程带来的内存压力。</p>
+<p>不足：在目前 JDK21 的版本中，虚拟线程存在的坑还比较多，个人不建议在可靠性要求较高的应用上直接大规模使用。</p>
+<p>尤其需要注意 <code>synchronized</code> 与虚拟线程绑定平台线程的问题。轻则降低吞吐量，严重可能导致死锁。虚拟线程可以灰度，但不要和 JDK 升级本身混成一个变量。</p>
+<h3 id="衍生生态"><a href="#衍生生态" class="headerlink" title="衍生生态"></a>衍生生态</h3><p>许多 Java 生态框架都基于高版本 JDK 开发，并不再维护低 JDK 版本。如果想要探索基于高版本的框架，那么升级 JDK 也是势在必行的了。</p>
+<p>这类收益不一定马上体现在接口耗时上，但会体现在后续框架升级、依赖治理、工具链维护成本上。</p>
+<h2 id="2-什么应用适合升级-JDK？"><a href="#2-什么应用适合升级-JDK？" class="headerlink" title="2. 什么应用适合升级 JDK？"></a>2. 什么应用适合升级 JDK？</h2><table>
+<thead>
+<tr>
+<th>目标</th>
+<th>适用应用</th>
+<th>具体版本</th>
+<th>风险</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ZGC</td>
+<td>GC 延迟敏感的应用，例如缓存应用；本地有大缓存、频繁生成大对象的应用</td>
+<td>如果对吞吐量追求不高，可以考虑 JDK17 以上；如果对吞吐量有较高要求，需要升级 JDK21，并且开启分代特性</td>
+<td>分代 ZGC 需要经过充分验证后才可上线</td>
+</tr>
+<tr>
+<td>虚拟线程</td>
+<td>IO 密集型应用都可以评估，文件 IO 场景需要单独验证</td>
+<td>JDK21</td>
+<td><code>synchronized</code> 兼容不好时会导致虚拟线程与平台线程绑定，轻则降低吞吐量，严重可能导致死锁</td>
+</tr>
+<tr>
+<td>衍生生态</td>
+<td>需要按自己实际调研进行升级考虑，例如新框架、新工具链、新运行时能力</td>
+<td>按框架要求决定</td>
+<td>依赖兼容、构建插件、运行参数都要重新检查</td>
+</tr>
+</tbody></table>
+<p>这张表其实就是我的升级优先级判断：先明确收益目标，再决定升级策略。不要为了“统一版本”把 GC、虚拟线程、依赖升级一次性全打开。</p>
+<h2 id="3-实际收益"><a href="#3-实际收益" class="headerlink" title="3. 实际收益"></a>3. 实际收益</h2><h3 id="分代-ZGC"><a href="#分代-ZGC" class="headerlink" title="分代 ZGC"></a>分代 ZGC</h3><p>我们对一个缓存型服务升级了 JDK21，并使用分代 ZGC。在没有明显观察到资源占用提高的前提下，解决了 GC 带来的长尾问题。</p>
+<p>原始记录里这里有两张内部监控图，一张是发布前后的长尾响应耗时，一张是 JDK11 + G1 与 JDK21 + ZGC 的对比。公开版不放内部截图，只保留结论：</p>
+<ul>
+<li>接口响应时间本身不慢，但尾延迟容易被 GC pause 拉高。</li>
+<li>JDK21 + 分代 ZGC 后，长尾响应耗时有明显收敛。</li>
+<li>观察时不能只看 pause time，也要看 CPU、RSS、吞吐。</li>
+</ul>
+<p>另外可以参考 Netflix 这篇文章：</p>
+<p><a href="https://netflixtechblog.com/bending-pause-times-to-your-will-with-generational-zgc-256629c9386b">https://netflixtechblog.com/bending-pause-times-to-your-will-with-generational-zgc-256629c9386b</a></p>
+<h3 id="虚拟线程-1"><a href="#虚拟线程-1" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>我们在一个 IO 密集型服务里做过全面 JDK21 升级，并进行了虚拟线程灰度验证。</p>
+<p>当时观察到的一个现象是：对比非虚拟线程，平台线程数从 2000 左右降低到 300+。中间有一段时间因为某个依赖组件还不支持虚拟线程，内部仍然开了几百个平台线程；后续替换为虚拟线程池后，线程数量继续下降。</p>
+<p>接口 P95 的灰度对比大概是：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>非虚拟线程 JDK21 P95</th>
+<th>虚拟线程 JDK21 P95</th>
+<th>降幅</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>列表查询</td>
+<td>284</td>
+<td>239</td>
+<td>19%</td>
+</tr>
+<tr>
+<td>详情查询</td>
+<td>589</td>
+<td>493</td>
+<td>16.3%</td>
+</tr>
+</tbody></table>
+<p>加上升级 JDK21 本身带来的优化，对比 JDK11 的应用，虚拟线程 + JDK21 带来的 P95 降幅大概在 20%。</p>
+<p>这里需要强调：这个结果只说明“这类 IO 密集型场景值得测”，不代表所有服务开虚拟线程都会变快。</p>
+<h2 id="4-升级前准备"><a href="#4-升级前准备" class="headerlink" title="4. 升级前准备"></a>4. 升级前准备</h2><h3 id="IDE"><a href="#IDE" class="headerlink" title="IDE"></a>IDE</h3><p>IDE 要能正确支持 JDK21 的语法、编译、调试和运行配置。版本对应关系直接看官方说明：</p>
+<p><a href="https://www.jetbrains.com/help/idea/supported-java-versions.html">https://www.jetbrains.com/help/idea/supported-java-versions.html</a></p>
+<p>原始笔记里有一些本地安装和激活相关内容，公开博客不保留。</p>
+<h3 id="Maven"><a href="#Maven" class="headerlink" title="Maven"></a>Maven</h3><p>JDK 升级时 Maven 也要检查，尤其是：</p>
+<ul>
+<li><code>maven-compiler-plugin</code> 是否支持 JDK21。</li>
+<li><code>maven-surefire-plugin</code> / <code>maven-failsafe-plugin</code> 是否能在 JDK21 下正常跑测试。</li>
+<li>IDE 内置 Maven 与项目 Maven 版本是否一致。</li>
+<li>依赖 import 是否正常。</li>
+</ul>
+<p>有些问题不是 JDK21 本身导致的，而是 IDE、Maven、插件版本组合导致的。</p>
+<h3 id="运行参数"><a href="#运行参数" class="headerlink" title="运行参数"></a>运行参数</h3><p>升级时要重点检查旧参数：</p>
+<ul>
+<li>旧 GC 参数是否还存在，例如 CMS 相关参数。</li>
+<li>GC 日志是否迁移到 <code>-Xlog</code>。</li>
+<li><code>--add-opens</code> 是否仍然需要。</li>
+<li>agent 是否兼容 JDK21。</li>
+<li>监控、诊断、热修复工具是否依赖 JDK internals。</li>
+</ul>
+<h2 id="5-我的升级建议"><a href="#5-我的升级建议" class="headerlink" title="5. 我的升级建议"></a>5. 我的升级建议</h2><p>我更倾向于拆成几个阶段：</p>
+<ol>
+<li>只升级运行时，不换 GC，不开虚拟线程。</li>
+<li>压测 JDK21 + 原 GC，确认运行时升级本身没有问题。</li>
+<li>单独验证 JDK21 + 分代 ZGC。</li>
+<li>单独验证 JDK21 + 虚拟线程。</li>
+<li>如果要上虚拟线程，必须有独立开关和灰度策略。</li>
+</ol>
+<p>这样做的好处是问题好定位。否则 JDK 版本、GC、虚拟线程、依赖升级混在一起，一旦指标异常，很难判断到底是哪一个变量导致的。</p>
+<p>如果虚拟线程有问题，优先关闭虚拟线程，不要直接回滚 JDK。</p>
+<p>如果 ZGC 表现不符合预期，优先切回原 GC。</p>
+<p>只有运行时兼容本身有问题，才需要回退 JDK。</p>
+<h2 id="6-小结"><a href="#6-小结" class="headerlink" title="6. 小结"></a>6. 小结</h2><p>JDK21 升级的价值主要在三件事：</p>
+<ol>
+<li>ZGC：解决一类 GC pause 导致的长尾问题。</li>
+<li>虚拟线程：降低 IO 密集型服务的平台线程成本。</li>
+<li>衍生生态：让后续框架、工具链、运行时能力升级更顺。</li>
+</ol>
+<p>我的结论比较简单：JDK21 可以作为新的运行时基线去推进，但虚拟线程不要因为“正式发布了”就直接大规模用。JDK 升级和虚拟线程上线是两件事。</p>
+]]></content>
+      <categories>
+        <category>Java</category>
+      </categories>
+      <tags>
+        <tag>Java</tag>
+        <tag>JDK21</tag>
+        <tag>JVM</tag>
+        <tag>ZGC</tag>
+        <tag>Virtual Threads</tag>
       </tags>
   </entry>
   <entry>
@@ -1276,6 +1236,46 @@
       </categories>
       <tags>
         <tag>MySQL</tag>
+        <tag>索引</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>MVCC与覆盖索引</title>
+    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
+    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
+<span id="more"></span>
+
+<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
+<p>参考资料</p>
+<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
+<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
+<p>《Innodb存储引擎》</p>
+</blockquote>
+<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
+<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
+<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
+<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
+<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
+<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
+<p><strong>所以</strong></p>
+<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
+<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<p>所以覆盖索引不是总不需要回表的。</p>
+<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
+<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
+<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
+<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
+<p>个人认为这是一种效率与空间之间的权衡。</p>
+</li>
+</ul>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+        <tag>MVCC</tag>
         <tag>索引</tag>
       </tags>
   </entry>
