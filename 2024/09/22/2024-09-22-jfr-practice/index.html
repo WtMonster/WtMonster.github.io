@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"wtmonster.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文基于JDK11，对于jdk14的 JFR Event Streaming 以及JDK16引入的 jdk.ObjectAllocationSample 事件等不作过多讨论 什么是JFRJFR是 Java Flight Record(前身是JRocket Flight Record)，是 JVM 内置的基于事件的JDK监控记录框架。这个起名就是参考了黑匣子对于飞机的作用，将Java进程比喻成飞机飞">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JFR实战教程">
+<meta property="og:url" content="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/index.html">
+<meta property="og:site_name" content="大水怪">
+<meta property="og:description" content="本文基于JDK11，对于jdk14的 JFR Event Streaming 以及JDK16引入的 jdk.ObjectAllocationSample 事件等不作过多讨论 什么是JFRJFR是 Java Flight Record(前身是JRocket Flight Record)，是 JVM 内置的基于事件的JDK监控记录框架。这个起名就是参考了黑匣子对于飞机的作用，将Java进程比喻成飞机飞">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-13_18-59-55.png">
+<meta property="og:image" content="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-5_14-33-16.png">
+<meta property="og:image" content="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-5_14-35-55.png">
+<meta property="og:image" content="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-9-4_13-57-52.png">
+<meta property="article:published_time" content="2024-09-21T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-17T16:00:00.000Z">
+<meta property="article:author" content="WtMonster">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="JVM">
+<meta property="article:tag" content="JFR">
+<meta property="article:tag" content="JMC">
+<meta property="article:tag" content="Performance">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-13_18-59-55.png">
+
+<link rel="canonical" href="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>JFR实战教程 | 大水怪</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="大水怪" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">大水怪</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">一只专注技术的水怪</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+  <a href="https://github.com/WtMonster/WtMonster.github.io.git" class="github-corner" title="WtMonster GitHub" aria-label="WtMonster GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://wtmonster.github.io/2024/09/22/2024-09-22-jfr-practice/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="WtMonster">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="大水怪">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JFR实战教程
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2024-09-22 00:00:00" itemprop="dateCreated datePublished" datetime="2024-09-22T00:00:00+08:00">2024-09-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2025-10-18 00:00:00" itemprop="dateModified" datetime="2025-10-18T00:00:00+08:00">2025-10-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>本文基于JDK11，对于jdk14的 <a target="_blank" rel="noopener" href="https://openjdk.java.net/jeps/349">JFR Event Streaming </a>以及JDK16引入的 <a target="_blank" rel="noopener" href="https://bugs.openjdk.org/browse/JDK-8257602">jdk.ObjectAllocationSample </a>事件等不作过多讨论</strong></p>
+<h1 id="什么是JFR"><a href="#什么是JFR" class="headerlink" title="什么是JFR"></a>什么是JFR</h1><p>JFR是 Java Flight Record(前身是JRocket Flight Record)，是 JVM 内置的基于事件的JDK监控记录框架。这个起名就是参考了黑匣子对于飞机的作用，将Java进程比喻成飞机飞行。顾名思义，这个记录主要用于问题定位和持续监控。</p>
+<span id="more"></span>
+
+
+<p>官方描述 <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/328">https://openjdk.org/jeps/328</a></p>
+<p>JFR基于事件思想的起源 <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/167">https://openjdk.org/jeps/167</a></p>
+<p><a target="_blank" rel="noopener" href="https://bestsolution-at.github.io/jfr-doc/openjdk-11.html">JFR事件大全</a></p>
+<p>JFR是一个开销不超过1%（对比profiler官方声称对系统影响不超过2%，实测远远不止，因此不推荐在线上系统长期跑profiler），目标是用于线上持续监控的特性，在jdk11以前是一个商业特性，在2018年 Java Flight Recorder 开源并作为 OpenJDK 11 的一部分发布。</p>
+<p>jdk8u262后jfr被反向移植</p>
+<p><a target="_blank" rel="noopener" href="https://mail.openjdk.org/pipermail/jdk8u-dev/2020-July/012143.html">https://mail.openjdk.org/pipermail/jdk8u-dev/2020-July/012143.html</a></p>
+<p><a target="_blank" rel="noopener" href="https://bugs.openjdk.org/browse/JDK-8223147">https://bugs.openjdk.org/browse/JDK-8223147</a></p>
+<p><a target="_blank" rel="noopener" href="https://hg.openjdk.org/jdk8u/jdk8u-jfr-incubator/">https://hg.openjdk.org/jdk8u/jdk8u-jfr-incubator/</a></p>
+<p>这意味着在jdk8u262以后的版本也可以自由使用jfr了。</p>
+<p>当然，在某些供应商的open jdk8中可能更早被免费开放，比如Azul的openjdk。</p>
+<p>JFR，具有以下关键的特性： - 低开销（在配置正确的情况下），可在生产环境核心业务进程中始终在线运行。当然，也可以随时开启与关闭。</p>
+<p>- 可以查看出问题时间段内进行分析，可以分析 Java 应用程序，JVM 内部以及当前Java进程运行环境等多因素。</p>
+<p>- JFR基于事件采集，可以分析非常底层的信息，例如对象分配，方法采样与热点方法定位与调用堆栈，安全点分析与锁占用时长与堆栈分析，GC 相关分析以及 JIT 编译器相关分析（例如 CodeCache ）</p>
+<p>- 完善的 API 定义，用户可以自定义事件生产与消费。</p>
+<h2 id="为什么要使用JFR"><a href="#为什么要使用JFR" class="headerlink" title="为什么要使用JFR"></a>为什么要使用JFR</h2><p><strong>存在的问题</strong></p>
+<ol>
+<li><p>目前通过 <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/8/docs/technotes/guides/jmx/index.html">JMX </a>对jvm的监控粒度比较粗，线上出现非业务逻辑问题后一般只能通过dump堆快照结合日志来进行分析，对jvm的详细把控只能通过dump来获得瞬时的状态进行分析（且dump操作需要拉出后再进行，可能dump到的数据并不准确）。</p>
+</li>
+<li><p>从业务层面看，目前业务线的代码业务逻辑比较复杂，且部分老代码存在可读性低的情况，常常难以直观感知到性能瓶颈。</p>
+</li>
+</ol>
+<ol start="3">
+<li><p>从组件框架层面看，公司内部以及业务线的组件封装层次比较深，并且日常工作忙于需求开发，因此日常接触的层次主要集中在业务代码层面，导致难以定位到框架或组件代码中可能存在的性能瓶颈。</p>
+</li>
+<li><p>就业务研发团队与组件研发团队结合而言，组件开发人员感知集中在组件代码层面，容易忽视一些业务场景下的调用特征，可能导致一些业务场景独有的瓶颈。而业务开发人员的感知集中在业务层面，且由于业务复杂，框架封装层次深，难以直观感知到组件层面导致的瓶颈。导致二者难以形成整体的感知，只能各自为政。</p>
+</li>
+</ol>
+<ol start="5">
+<li>目前对应用的优化以代码重构与架构重构为主，但重构代价大，周期长，往往难以推进。因此有时候通过消除代码层面的瓶颈来提升应用性能也是一个不错的选择。</li>
+</ol>
+<p><strong>使用JFR的好处</strong></p>
+<ol>
+<li><p>定位问题直达本质。jfr的思想是万物皆为event，这些event可以是jvm的事件，例如进入safepoint，stw，锁争用，内存分配，线程上下文切换等，也可以是自定义事件。这些event直接反映了应用在jvm和操作系统等层面的根本开销。并且jfr对各类事件进行聚合，通过火焰图等方式让开发者能够从jvm和操作系统层面反向定位到代码层面，极大程度上消除了代码水平逻辑复杂，调用深度复杂导致性能与开销瓶颈定位困难的问题，在推动jdk升级的背景下，对JVM有更全面的监控是十分必要的。</p>
+</li>
+<li><p>JFR监控开销很低。根据官方描述可以做到将开销控制在1%，是完全可以接受的。一些常用的监控手段，比如jstack和jmap，需要让JVM进入safepoint状态才能获取线程堆栈和内存使用情况等信息。而这样的操作会导致JVM暂停应用程序的执行，从而降低线上应用的性能。 对于JMX等外部监控来说存在网络开销的问题。JFR通过在JVM内部进行数据采集，可以实现非常低的性能开销。</p>
+</li>
+</ol>
+<ol start="3">
+<li>使用JFR有助于形成对JVM更全面的认知。在日常开发中，JVM的情况往往是一个只暴露少数指标的黑盒，难以做到具体的感知。使用JFR有助于使用者形成对JVM更全面的认知。</li>
+</ol>
+<p><strong>JFR的使用场景</strong></p>
+<ol>
+<li><p>分析应用瓶颈。本地分析应用瓶颈可以通过jmeter模拟生产流量，或者在mirror中回放生产流量的方式来进行监控，这种方式下可以采用比较激进的jfc配置（下面会讲到），对应用进行更全面的事件采集。</p>
+</li>
+<li><p>线上性能监控、辅助问题定位。线上可以使用default.jfc或者自定义配置来进行低开销的事件采集。通过dump一段时间内的jfr记录来分析应用瓶颈和问题所在。</p>
+</li>
+</ol>
+<h1 id="JFR历史"><a href="#JFR历史" class="headerlink" title="JFR历史"></a>JFR历史</h1><p>JFR 0.9 版本对应 JDK 7 和JDK 8：JDK 7u40 之后，实现了和 JRockit Flight Recorder 一样的功能，并添加了各项数据配置，用来打开或者关闭一些统计数据功能。而且，在 JDK 8u40 之后，可以在运行时灵活地打开关闭 JFR。<br>JFR 1.0 版本对应 JDK 9 和 JDK 10： 在这一版本之后，增加了 JFR 事件接口，用户可以生产或者消费某种事件。<br>JFR 2.0 版本对应 JDK 11，这一版本就是本文主要基于的版本。<br>JDK 14 推出了 <a target="_blank" rel="noopener" href="https://openjdk.java.net/jeps/349">JFR Event Streaming </a>，让用户处理 JFR 事件更加灵活方便 。</p>
+<h1 id="JDK相关"><a href="#JDK相关" class="headerlink" title="JDK相关"></a>JDK相关</h1><h3 id="JDK下载"><a href="#JDK下载" class="headerlink" title="JDK下载"></a>JDK下载</h3><p><a target="_blank" rel="noopener" href="https://jdk.java.net/archive/">https://jdk.java.net/archive/</a></p>
+<h3 id="JDK源码下载"><a href="#JDK源码下载" class="headerlink" title="JDK源码下载"></a>JDK源码下载</h3><p><a target="_blank" rel="noopener" href="https://mirrors.omnios.org/openjdk/">https://mirrors.omnios.org/openjdk/</a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/openjdk/jdk/tags">https://github.com/openjdk/jdk/tags</a></p>
+<h3 id="JFR源码"><a href="#JFR源码" class="headerlink" title="JFR源码"></a>JFR源码</h3><p><a target="_blank" rel="noopener" href="https://github.com/AdoptOpenJDK/openjdk-jdk11/tree/master/src/jdk.jfr/share/classes/jdk/jfr">https://github.com/AdoptOpenJDK/openjdk-jdk11/tree/master/src/jdk.jfr/share/classes/jdk/jfr</a></p>
+<h1 id="Tools"><a href="#Tools" class="headerlink" title="Tools"></a>Tools</h1><h2 id="JMC安装"><a href="#JMC安装" class="headerlink" title="JMC安装"></a>JMC安装</h2><p>JMC是用于分析JFR事件的开源工具，可以帮助我们更好地分析各类事件，JFR页面如下所示。</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/openjdk/jmc">https://github.com/openjdk/jmc</a></p>
+<p><img src="JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-13_18-59-55.png"></p>
+<h2 id="JMC源码"><a href="#JMC源码" class="headerlink" title="JMC源码"></a>JMC源码</h2><p><a target="_blank" rel="noopener" href="https://github.com/openjdk/jmc">https://github.com/openjdk/jmc</a></p>
+<h2 id="JMC-JFR-WIN"><a href="#JMC-JFR-WIN" class="headerlink" title="JMC-JFR(WIN)"></a>JMC-JFR(WIN)</h2><h3 id="idea使用JFR（不推荐）注意要点"><a href="#idea使用JFR（不推荐）注意要点" class="headerlink" title="idea使用JFR（不推荐）注意要点"></a>idea使用JFR（不推荐）注意要点</h3><p>idea自带的jfr可能存在各种问题，包括事件采集不全面，功能较少等， <strong>推荐使用JMC进行采集和分析</strong></p>
+<p>并且JFR在低版本的idea中并未得到支持，并且在开始支持的较低版本可能存在各种问题（比如使用idea自带的JFR看不到内存分析等，虽然可能是由于jfc配置导致的），可以在此下载2023.1版本的idea。</p>
+<p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/xxcbdhxx/archive/2023/03/30/17271151.html">https://www.cnblogs.com/xxcbdhxx/archive/2023/03/30/17271151.html</a></p>
+<p>idea自带的JFR似乎无法分析由应用容器直接启动的应用（未做进一步确定，可以自己尝试），建议使用SpringBoot启动。</p>
+<p>idea中c对jfr的cpu火焰图似乎还不错。</p>
+<h2 id="JMC-JFR-MAC"><a href="#JMC-JFR-MAC" class="headerlink" title="JMC-JFR(MAC)"></a>JMC-JFR(MAC)</h2><h3 id="JMC安装到使用过程的问题"><a href="#JMC安装到使用过程的问题" class="headerlink" title="JMC安装到使用过程的问题"></a>JMC安装到使用过程的问题</h3><p>1.</p>
+<p><img src="JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-5_14-33-16.png"></p>
+<p><strong>解决：</strong></p>
+<p>电脑环境是Mac m2 ，macOS版本是Ventura 13.2.1。</p>
+<p>mac默认使用/Library/JavaJavaVirtualMachines目录下的最新版本JDK，而系统原本最新JDK版本是11。</p>
+<p>JDK在15以前只有Mac Linux Windows三种环境的版本，在15以后才有支持aarch64的版本，m系列芯片是aarch64(arm64)架构,因此报错。</p>
+<p>2.</p>
+<p><img src="JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-8-5_14-35-55.png"></p>
+<p><strong>解决：</strong></p>
+<p>使用SpringBoot启动，使用JMC连接虚拟机时需要设置变量：</p>
+<p>System . setProperty ( &quot;java.rmi.server.hostname&quot; , &quot;Ip or DNS of the server&quot; );</p>
+<h2 id="JFR具体使用"><a href="#JFR具体使用" class="headerlink" title="JFR具体使用"></a>JFR具体使用</h2><h3 id="方式1-使用JVM参数启动"><a href="#方式1-使用JVM参数启动" class="headerlink" title="方式1 使用JVM参数启动"></a>方式1 使用JVM参数启动</h3><p>例如</p>
+<p>-XX:StartFlightRecording=disk=true,dumponexit=true,name=profile_online,filename=/tmp/recording.jfr,maxsize=4096m,maxage=1d,settings=/path/to/custom.jfc,path-to-gc-roots=false</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>默认值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>delay</td>
+<td>0</td>
+<td>延迟多久后启动 JFR 记录，支持带单位配置， 例如 delay=60s（秒）， delay=20m（分钟）， delay=1h（小时）， delay=1d（天），不带单位就是秒， 0就是没有延迟直接开始记录。一般为了避免框架初始化等影响，我们会延迟 1 分钟开始记录（例如Spring cloud应用，可以看下日志中应用启动耗时，来决定下这个时间）。</td>
+</tr>
+<tr>
+<td>disk</td>
+<td>true</td>
+<td>是否写入磁盘，这个就是上文提到的， global buffer 满了之后，是直接丢弃还是写入磁盘文件。</td>
+</tr>
+<tr>
+<td>dumponexit</td>
+<td>false</td>
+<td>程序退出时，是否要dump出 .jfr文件</td>
+</tr>
+<tr>
+<td>duration</td>
+<td>0</td>
+<td>JFR 记录持续时间，同样支持单位配置，不带单位就是秒，0代表不限制持续时间，一直记录。</td>
+</tr>
+<tr>
+<td>filename</td>
+<td></td>
+<td>启动目录/hotspot-pid-26732-id-1-2020_03_12_10_07_22.jfr，pid 后面就是 pid， id 后面是第几个 JFR 记录，可以启动多个 JFR 记录。最后就是时间。 | dump的输出文件</td>
+</tr>
+<tr>
+<td>name</td>
+<td>无</td>
+<td>记录名称，由于可以启动多个 JFR 记录，这个名称用于区分，否则只能看到一个记录 id，不好区分。</td>
+</tr>
+<tr>
+<td>maxage</td>
+<td>0</td>
+<td>这个参数只有在 disk 为 true 的情况下才有效。最大文件记录保存时间，就是 global buffer 满了需要刷入本地临时目录下保存，这些文件最多保留多久的。也可以通过单位配置，没有单位就是秒，默认是0，就是不限制</td>
+</tr>
+<tr>
+<td>maxsize</td>
+<td>250MB</td>
+<td>这个参数只有在 disk 为 true 的情况下才有效。最大文件大小，支持单位配置， 不带单位是字节，m或者M代表MB，g或者G代表GB。设置为0代表不限制大小**。虽然官网说默认就是0，但是实际用的时候，不设置会有提示**： No limit specified, using maxsize=250MB as default. 注意，这个配置不能小于后面将会提到的 maxchunksize 这个参数。</td>
+</tr>
+<tr>
+<td>path-to-gc-roots</td>
+<td>false</td>
+<td>是否记录GC根节点到活动对象的路径，一般不打开这个，首先这个在我个人定位问题的时候，很难用到，只要你的编程习惯好。还有就是打开这个，性能损耗比较大，会导致FullGC一般是在怀疑有内存泄漏的时候热启动这种采集，并且通过产生对象堆栈无法定位的时候，动态打开即可。一般通过产生这个对象的堆栈就能定位，如果定位不到，怀疑有其他引用，例如 ThreadLocal 没有释放这样的，可以在 dump 的时候采集 gc roots</td>
+</tr>
+<tr>
+<td>settings</td>
+<td>default.jfc</td>
+<td>这个位于 `$JAVA_HOME/lib/jfr/default.jfc`| 采集 Event 的详细配置，采集的每个 Event 都有自己的详细配置。另一个 JDK 自带的配置是 profile.jfc，位于 `$JAVA_HOME/lib/jfr/profile.jfc`。</td>
+</tr>
+</tbody></table>
+<p><strong>其他配置</strong></p>
+<p><strong>-XX:FlightRecorderOptions</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>allow_threadbuffers_to_disk</td>
+<td>false</td>
+<td>是否允许 在 thread buffer 线程阻塞的时候，直接将 thread buffer 的内容写入文件。默认不启用，一般没必要开启这个参数，只要你设置的参数让 global buffer 大小合理不至于刷盘很慢，就行了</td>
+</tr>
+<tr>
+<td>globalbuffersize</td>
+<td>如果不设置，根据设置的 memorysize 自动计算得出</td>
+<td>单个 global buffer 的大小，一般通过 memorysize 设置，不建议自己设置</td>
+</tr>
+<tr>
+<td>maxchunksize</td>
+<td>12M</td>
+<td>存入磁盘的每个临时文件的大小。默认为12MB，不能小于1M。可以用单位配置，不带单位是字节，m或者M代表MB，g或者G代表GB。注意这个大小最好不要比 memorySize 小，更不能比 globalbuffersize 小，否则会导致性能下降</td>
+</tr>
+<tr>
+<td>memorysize</td>
+<td>10M</td>
+<td>JFR的 global buffer 占用的整体内存大小，一般通过设置这个参数，numglobalbuffers 还有 globalbuffersize 会被自动计算出。可以用单位配置，不带单位是字节，m或者M代表MB，g或者G代表GB。</td>
+</tr>
+<tr>
+<td>numglobalbuffers</td>
+<td>如果不设置，根据设置的 memorysize 自动计算得出</td>
+<td>global buffer的个数，一般通过 memorysize 设置，不建议自己设置</td>
+</tr>
+<tr>
+<td>old-object-queue-size</td>
+<td>256</td>
+<td>对于Profiling中的 Old Object Sample 事件，记录多少个 Old Object，这个配置并不是越大越好。一般应用256就够，时间跨度大的，例如 maxage 保存了一周以上的，可以翻倍</td>
+</tr>
+<tr>
+<td>repository</td>
+<td>等同于 - <a target="_blank" rel="noopener" href="http://djava.io/">Djava.io </a>.tmpdir 指定的目录</td>
+<td>JFR 保存到磁盘的临时记录的位置</td>
+</tr>
+<tr>
+<td>retransform</td>
+<td>true</td>
+<td>是否通过 JVMTI 转换 JFR 相关 Event 类，如果设置为 false，则只在 Event 类加载的时候添加相应的 Java Instrumentation，这个一般不用改，这点内存 metaspace 还是足够的</td>
+</tr>
+<tr>
+<td>samplethreads</td>
+<td>true</td>
+<td>这个是是否开启线程采集的状态位配置，只有这个配置为 true，并且在 Event 配置中开启线程相关的采集（这个后面会提到），才会采集这些事件。</td>
+</tr>
+<tr>
+<td>stackdepth</td>
+<td>64</td>
+<td>采集事件堆栈深度，有些 Event 会采集堆栈，这个堆栈采集的深度，统一由这个配置指定。注意这个值不能设置过大，如果你采集的 Event种类很多，堆栈深度大很影响性能。比如你用的是 default.jfc 配置的采集，堆栈深度64基本上就是不影响性能的极限了。你可以自定义采集某些事件，增加堆栈深度。</td>
+</tr>
+<tr>
+<td>threadbuffersize</td>
+<td>8KB</td>
+<td>threadBuffer 大小，最好不要修改这个，如果增大，那么随着你的线程数增多，内存占用会增大。过小的话，刷入 global buffer 的次数就会变多。8KB 就是经验中最合适的。</td>
+</tr>
+</tbody></table>
+<h3 id="方式2-使用jcmd"><a href="#方式2-使用jcmd" class="headerlink" title="方式2 使用jcmd"></a>方式2 使用jcmd</h3><p><strong>1.启动 JFR 记录</strong></p>
+<p>jcmd &lt;pid&gt; JFR.start</p>
+<p><strong>例如</strong>&#x6A;cmd 85 JFR.start name=profile_online filename=/tmp/recording.jfr maxage=1d maxsize=2g settings=opt/app/WEB-INF/tars/fat/custom.jfc</p>
+<p>参数 与上面通过JVM参数启动的方式一致,如果使用JVM参数开启了记录的话dump指定时间的记录就行</p>
+<p><strong>2.dumpJFR记录</strong></p>
+<p>jcmd &lt;pid&gt; JFR.dump</p>
+<p><strong>例如</strong>&#x6A;cmd 83 JFR.dump begin=16:06 end=16:08 name=profile_online filename=/tmp/profile- `hostname`-`date +%Y_%m_%d_%H_%M_%S`.jfr</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>name</td>
+<td>无</td>
+<td>指定要查看的 JFR 记录名称</td>
+</tr>
+<tr>
+<td>filename</td>
+<td>无</td>
+<td>指定文件输出位置</td>
+</tr>
+<tr>
+<td>maxage</td>
+<td>0</td>
+<td>dump最多的时间范围的文件，可以通过单位配置，没有单位就是秒，默认是0，就是不限制</td>
+</tr>
+<tr>
+<td>maxsize</td>
+<td>0</td>
+<td>dump最大文件大小，支持单位配置， 不带单位是字节，m或者M代表MB，g或者G代表GB。设置为0代表不限制大小</td>
+</tr>
+<tr>
+<td>begin</td>
+<td>无</td>
+<td>dump开始位置， 可以这么配置：09:00, 21:35:00, 2018-06-03T18:12:56.827Z, 2018-06-03T20:13:46.832, -10m, -3h, or -1d</td>
+</tr>
+<tr>
+<td>end</td>
+<td>无</td>
+<td>dump结束位置，可以这么配置： 09:00, 21:35:00, 2018-06-03T18:12:56.827Z, 2018-06-03T20:13:46.832, -10m, -3h, or -1d (STRING, no default value)</td>
+</tr>
+<tr>
+<td>path-to-gc-roots</td>
+<td>false</td>
+<td>是否记录GC根节点到活动对象的路径，一般不记录，dump 的时候打开这个肯定会触发一次 fullGC，对线上应用有影响。最好参考之前对于 JFR 启动记录参数的这个参数的描述，考虑是否有必要</td>
+</tr>
+</tbody></table>
+<p><strong>下载dump文件</strong></p>
+<p><strong>【推荐】方式1:</strong></p>
+<p>jcmd 72 JFR.dump begin=19:59 end=20:01 name=profile_online filename=/tmp/profile_ `hostname`-`date +%Y_%m_%d_%H_%M_%S`.jfr</p>
+<p><strong>方式2:</strong></p>
+<p>在跳板机切到sftp，下载指定jfr文件即可（dump文件建议dump到tmp目录，这样可以在sftp页面直接看到对应文件）</p>
+<p><strong>3.停止JFR记录</strong></p>
+<p>jcmd &lt;pid&gt; JFR.stop</p>
+<p><strong>4.查看正在执行的JFR记录</strong></p>
+<p>jcmd &lt;pid&gt; JFR.check</p>
+<p><strong>5.查看或修改JFR配置参数</strong></p>
+<p>jcmd &lt;pid&gt; JFR.configure</p>
+<p>如果不传入参数，则是查看当前配置，传入参数就是修改配置。</p>
+<p>更多jcmd使用可以查看 <a target="_blank" rel="noopener" href="https://docs.oracle.com/javacomponents/jmc-5-5/jfr-runtime-guide/run.htm#JFRRT172">https://docs.oracle.com/javacomponents/jmc-5-5/jfr-runtime-guide/run.htm#JFRRT172</a></p>
+<p>对于参数的介绍也可以查看redHat的文档 <a target="_blank" rel="noopener" href="https://access.redhat.com/documentation/zh-cn/openjdk/11/html/using_jdk_flight_recorder_with_openjdk/index">https://access.redhat.com/documentation/zh-cn/openjdk/11/html/using_jdk_flight_recorder_with_openjdk/index</a></p>
+<h3 id="方式3-使用JMC直接连接"><a href="#方式3-使用JMC直接连接" class="headerlink" title="方式3 使用JMC直接连接"></a>方式3 使用JMC直接连接</h3><p>本地分析时非常推荐使用这种方式，操作比较简单，就不展开了</p>
+<h3 id="JFR自定义配置文件"><a href="#JFR自定义配置文件" class="headerlink" title="JFR自定义配置文件"></a>JFR自定义配置文件</h3><p><strong>建议关闭 OldObjectSample事件采集，它可能导致内存泄漏（如果需要开启的话建议在mirror上开启后接入流量观察几天，查看RSS使用率是否正常）</strong></p>
+<p>JDK中自带了两份jfc配置文件</p>
+<ul>
+<li><p><code>default.jfc</code> ： <em>default</em>&#x914D;置文件是一种低开销配置，可以安全地在生产环境中连续使用。开销通常小于 1%。</p>
+</li>
+<li><p><code>profile.jfc</code> ： <em>profile</em>&#x914D;置文件是一种低开销配置，非常适合用于分析瓶颈。开销通常低于 2%（官方宣称）。</p>
+</li>
+</ul>
+<p>对于profile.jfc,经过实测，性能开销不止官方宣称的2%， <strong>不适合用于生产环境长期开启</strong>。</p>
+<p>JFR中有一些指标监控已经在JMX中存在，对于一些异常和ERROR的记录也能通过现有的log进行分析，因此不必重复记录。</p>
+<p>另外对于一些事件的记录开销比较大，例如ObjectAllocationInNewTLAB和ObjectAllocationOutsideTLAB，也一些事件对应用问题的排查参考意义不大，因此需要调整或关闭这部分事件的采集，在需要采集时再动态开启。</p>
+<p>此外有一部分事件的采集频率需要根据应用情况适当调整。</p>
+<p>进行上述调整后得到了自定义配置文件(V1.0)，在启动JFR监控时使用这份jfc配置用于线上长期采集。</p>
+<p>这份配置文件采取了 <strong>比较保守</strong>&#x7684;配置，可以根据自己的应用需求具体调整。</p>
+<p><a target="_blank" rel="noopener" href="https://jeyzer.org/resources/jfr/jeyzer.jfc">Jeyzer 的 jfc 配置参考</a></p>
+<h3 id="JFR文件拆分"><a href="#JFR文件拆分" class="headerlink" title="JFR文件拆分"></a>JFR文件拆分</h3><p>我们可能一次性dump了比较多的记录，或者想要一次性dump一段比较长时间的记录进行分析，但是jmc对jfr记录的分析十分消耗cpu和内存，所以对于比较大的jfr记录我们需要对其进行拆分</p>
+<p>我们可以使用jdk自带的命令来完成这个需求</p>
+<p>官方文档 <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/17/docs/specs/man/jfr.html">The jfr Command</a></p>
+<p>用法例如</p>
+<p>/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home/bin/jfr disassemble –max-chunks 1 –output ./ ./profile_data.jfr</p>
+<p><img src="JFR%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B-image2023-9-4_13-57-52.png"></p>
+<h3 id="开启JFR对性能的影响测试-todo"><a href="#开启JFR对性能的影响测试-todo" class="headerlink" title="开启JFR对性能的影响测试(todo)"></a>开启JFR对性能的影响测试(todo)</h3><p>本测试的条件是在使用JVM参数开启JFR记录，已经平稳运行的应用上测试dump文件的影响、停止JFR的影响、以及开启JFR的影响。</p>
+<p>主要通过查看执行JFR指令时cpu load和response time的抖动情况来评估</p>
+<h4 id="一个缓存型服务"><a href="#一个缓存型服务" class="headerlink" title="一个缓存型服务"></a>一个缓存型服务</h4><p>一个缓存型服务是一个缓存应用，接口响应时间快、性能高，能承受比较大的并发。如果JFR会导致比较大的开销，比较容易能在响应时间上看出来。</p>
+<p>对一个缓存型服务设置每分钟24k左右的单机流量请求，远高于线上的请求量，一方面JFR会记录到更多事件，放大JFR的开销，另一方面可以测试出在系统压力较大情况下JFR对系统的影响</p>
+<p>测试期间的监控指标如下</p>
+<p>1.dump测试</p>
+<p>在23:25的时候dump了5分钟的数据，从监控可以看出来并没有导致系统出现明显的抖动</p>
+<p>从原理角度也很好解释，因为JFR是持续记录的，我们dump文件时JFR只需要拉取一段时间内已有的记录给我们，而不需要在dump时再进行太多分析。</p>
+<p>2.stop测试</p>
+<p>在23:36时stop JFR，并未观察到明显抖动</p>
+<p>3.start 测试</p>
+<p>在23:55时开启了JFR，开启时也没有观察到系统明显的抖动，或是开启后性能的降低</p>
+<h3 id="待完成部分"><a href="#待完成部分" class="headerlink" title="待完成部分"></a>待完成部分</h3><p><strong>Cryostat：容器化的JFR</strong></p>
+<p><a target="_blank" rel="noopener" href="https://cryostat.io/">Cryostat官网</a></p>
+<p><a target="_blank" rel="noopener" href="https://developers.redhat.com/articles/2021/11/09/automating-jdk-flight-recorder-containers">Automating JDK Flight Recorder in containers</a></p>
+<p><a target="_blank" rel="noopener" href="https://developers.redhat.com/articles/2021/10/18/announcing-cryostat-20-jdk-flight-recorder-containers">Announcing Cryostat 2.0: JDK Flight Recorder for containers</a></p>
+<h3 id="推荐阅读"><a href="#推荐阅读" class="headerlink" title="推荐阅读"></a>推荐阅读</h3><p><a target="_blank" rel="noopener" href="https://bestsolution-at.github.io/jfr-doc/openjdk-11.html">JFR事件大全</a></p>
+<p><a target="_blank" rel="noopener" href="https://access.redhat.com/documentation/en-us/red_hat_build_of_openjdk/11/html/using_jdk_flight_recorder_with_red_hat_build_of_openjdk/index">JFR教程-redhat-jdk11</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/column/c_1264859821121355776">JFR专题-hashcon</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV148411K742/?share_source=copy_web&vd_source=d30c780580db9da56e2e4f9fa6acf1a5">JFR编程与使用入门-video</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV13m4y1i7Nv/?share_source=copy_web&vd_source=d30c780580db9da56e2e4f9fa6acf1a5">JFR-JVM进程最全面低消耗持续线上监控-video</a></p>
+<p><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/64024144/how-to-configure-the-interval-of-a-custom-jfr-event">自定义事件</a></p>
+<h3 id="拓展阅读"><a href="#拓展阅读" class="headerlink" title="拓展阅读"></a>拓展阅读</h3><p><a target="_blank" rel="noopener" href="https://jeyzer.org/">Jeyzer:the incident analysis solution for Java</a></p>
+<p><a target="_blank" rel="noopener" href="https://jeyzer.org/resources/jfr/jeyzer.jfc">Jeyzer 的 jfc 配置参考</a></p>
+<p><a target="_blank" rel="noopener" href="https://jeyzer.org/jeyzer-and-jfr/">jeyzer and jfr</a></p>
+<h3 id="其他阅读"><a href="#其他阅读" class="headerlink" title="其他阅读"></a>其他阅读</h3><p><a target="_blank" rel="noopener" href="https://github.com/thegreystone/jmc-tutorial/tree/master/docs">JMC教程(有点过时)</a></p>
+<p><a target="_blank" rel="noopener" href="https://confluence.atlassian.com/enterprise/diagnosing-runtime-issues-using-the-java-flight-recorder-1127256408.html">参考</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.morling.dev/blog/rest-api-monitoring-with-custom-jdk-flight-recorder-events/">自定义JFR事件</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.reddit.com/r/java/comments/13n10ac/how_widely_is_jfr_java_flight_recorder_used/?onetap_auto=true">JFR讨论</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.w3computing.com/articles/java-flight-recorder-advanced-profiling-diagnostics-techniques/">JFR使用</a></p>
+<p><a target="_blank" rel="noopener" href="https://foojay.io/today/continuous-production-profiling-and-diagnostics/">重点看看</a></p>
+<p><a target="_blank" rel="noopener" href="http://missioncontrol.mcnz.com/">JFR-JMC教程</a></p>
+<p><a target="_blank" rel="noopener" href="https://docs.newrelic.com/docs/apm/agents/java-agent/features/real-time-profiling-java-using-jfr-metrics/">new Relic集成JFR监控</a></p>
+<p><a target="_blank" rel="noopener" href="https://docs.datadoghq.com/profiler/enabling/java/?tab=datadogprofiler"><strong>data dog</strong></a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/cryostatio/jfr-datasource">grafana集成JFR</a></p>
+<p><a target="_blank" rel="noopener" href="https://access.redhat.com/documentation/en-us/red_hat_build_of_cryostat/2/html/using_cryostat_to_manage_a_jfr_recording/assembly_integrated-applications_assembly_event-templates">grafana集成JFR-redhat</a></p>
+<p><a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/toc.html">JVM监控指南（包括JFR）</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JVM/" rel="tag"># JVM</a>
+              <a href="/tags/JFR/" rel="tag"># JFR</a>
+              <a href="/tags/JMC/" rel="tag"># JMC</a>
+              <a href="/tags/Performance/" rel="tag"># Performance</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2024/09/05/2024-09-05-loom-virtual-threads/" rel="prev" title="Loom(虚拟线程)相关">
+      <i class="fa fa-chevron-left"></i> Loom(虚拟线程)相关
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/10/05/2024-10-05-jdk21-25-features/" rel="next" title="JDK21-25重要特性解读">
+      JDK21-25重要特性解读 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AFJFR"><span class="nav-number">1.</span> <span class="nav-text">什么是JFR</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E4%BD%BF%E7%94%A8JFR"><span class="nav-number">1.1.</span> <span class="nav-text">为什么要使用JFR</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#JFR%E5%8E%86%E5%8F%B2"><span class="nav-number">2.</span> <span class="nav-text">JFR历史</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#JDK%E7%9B%B8%E5%85%B3"><span class="nav-number">3.</span> <span class="nav-text">JDK相关</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#JDK%E4%B8%8B%E8%BD%BD"><span class="nav-number">3.0.1.</span> <span class="nav-text">JDK下载</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JDK%E6%BA%90%E7%A0%81%E4%B8%8B%E8%BD%BD"><span class="nav-number">3.0.2.</span> <span class="nav-text">JDK源码下载</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JFR%E6%BA%90%E7%A0%81"><span class="nav-number">3.0.3.</span> <span class="nav-text">JFR源码</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Tools"><span class="nav-number">4.</span> <span class="nav-text">Tools</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#JMC%E5%AE%89%E8%A3%85"><span class="nav-number">4.1.</span> <span class="nav-text">JMC安装</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JMC%E6%BA%90%E7%A0%81"><span class="nav-number">4.2.</span> <span class="nav-text">JMC源码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JMC-JFR-WIN"><span class="nav-number">4.3.</span> <span class="nav-text">JMC-JFR(WIN)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#idea%E4%BD%BF%E7%94%A8JFR%EF%BC%88%E4%B8%8D%E6%8E%A8%E8%8D%90%EF%BC%89%E6%B3%A8%E6%84%8F%E8%A6%81%E7%82%B9"><span class="nav-number">4.3.1.</span> <span class="nav-text">idea使用JFR（不推荐）注意要点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JMC-JFR-MAC"><span class="nav-number">4.4.</span> <span class="nav-text">JMC-JFR(MAC)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#JMC%E5%AE%89%E8%A3%85%E5%88%B0%E4%BD%BF%E7%94%A8%E8%BF%87%E7%A8%8B%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">4.4.1.</span> <span class="nav-text">JMC安装到使用过程的问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JFR%E5%85%B7%E4%BD%93%E4%BD%BF%E7%94%A8"><span class="nav-number">4.5.</span> <span class="nav-text">JFR具体使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B9%E5%BC%8F1-%E4%BD%BF%E7%94%A8JVM%E5%8F%82%E6%95%B0%E5%90%AF%E5%8A%A8"><span class="nav-number">4.5.1.</span> <span class="nav-text">方式1 使用JVM参数启动</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B9%E5%BC%8F2-%E4%BD%BF%E7%94%A8jcmd"><span class="nav-number">4.5.2.</span> <span class="nav-text">方式2 使用jcmd</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B9%E5%BC%8F3-%E4%BD%BF%E7%94%A8JMC%E7%9B%B4%E6%8E%A5%E8%BF%9E%E6%8E%A5"><span class="nav-number">4.5.3.</span> <span class="nav-text">方式3 使用JMC直接连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JFR%E8%87%AA%E5%AE%9A%E4%B9%89%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="nav-number">4.5.4.</span> <span class="nav-text">JFR自定义配置文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JFR%E6%96%87%E4%BB%B6%E6%8B%86%E5%88%86"><span class="nav-number">4.5.5.</span> <span class="nav-text">JFR文件拆分</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%80%E5%90%AFJFR%E5%AF%B9%E6%80%A7%E8%83%BD%E7%9A%84%E5%BD%B1%E5%93%8D%E6%B5%8B%E8%AF%95-todo"><span class="nav-number">4.5.6.</span> <span class="nav-text">开启JFR对性能的影响测试(todo)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%80%E4%B8%AA%E7%BC%93%E5%AD%98%E5%9E%8B%E6%9C%8D%E5%8A%A1"><span class="nav-number">4.5.6.1.</span> <span class="nav-text">一个缓存型服务</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BE%85%E5%AE%8C%E6%88%90%E9%83%A8%E5%88%86"><span class="nav-number">4.5.7.</span> <span class="nav-text">待完成部分</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A8%E8%8D%90%E9%98%85%E8%AF%BB"><span class="nav-number">4.5.8.</span> <span class="nav-text">推荐阅读</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8B%93%E5%B1%95%E9%98%85%E8%AF%BB"><span class="nav-number">4.5.9.</span> <span class="nav-text">拓展阅读</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B6%E4%BB%96%E9%98%85%E8%AF%BB"><span class="nav-number">4.5.10.</span> <span class="nav-text">其他阅读</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="WtMonster"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">WtMonster</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">11</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/WtMonster" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;WtMonster" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://blog.csdn.net/qq_31923745" title="CSDN → https:&#x2F;&#x2F;blog.csdn.net&#x2F;qq_31923745" rel="noopener" target="_blank"><i class="fa fa-crosshairs fa-fw"></i>CSDN</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/17713895/wtmonster?tab=questions" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;17713895&#x2F;wtmonster?tab&#x3D;questions" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WtMonster</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a>
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script data-pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="Total Visitors">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="Total Views">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script color='' opacity='' zIndex='' count='' src="/lib/canvas-nest/canvas-nest-nomobile.min.js"></script>
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '94910566d35d27c13869',
+      clientSecret: '43e3747775f4ad48db2916b7c53987fd5431e7e6',
+      repo        : 'wtmonster.github.io',
+      owner       : 'WtMonster',
+      admin       : ['WtMonster'],
+      id          : 'a224b15681d84c46e36f33453609d6e9',
+        language: 'en',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>

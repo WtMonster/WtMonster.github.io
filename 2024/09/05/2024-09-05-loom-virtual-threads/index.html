@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"wtmonster.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="JDK21的 虚拟线程 目前存在许多严重bug，尽量不要在可靠性要求较高的服务中使用！ 简单介绍虚拟线程使用一个专用的，FIFO模式下的ForkJoin线程池（parallelStream使用的是LIFO模式）。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Loom(虚拟线程)相关">
+<meta property="og:url" content="https://wtmonster.github.io/2024/09/05/2024-09-05-loom-virtual-threads/index.html">
+<meta property="og:site_name" content="大水怪">
+<meta property="og:description" content="JDK21的 虚拟线程 目前存在许多严重bug，尽量不要在可靠性要求较高的服务中使用！ 简单介绍虚拟线程使用一个专用的，FIFO模式下的ForkJoin线程池（parallelStream使用的是LIFO模式）。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2024-09-04T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-09-09T16:00:00.000Z">
+<meta property="article:author" content="WtMonster">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="JDK21">
+<meta property="article:tag" content="JVM">
+<meta property="article:tag" content="Virtual Threads">
+<meta property="article:tag" content="Loom">
+<meta property="article:tag" content="JFR">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://wtmonster.github.io/2024/09/05/2024-09-05-loom-virtual-threads/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Loom(虚拟线程)相关 | 大水怪</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="大水怪" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">大水怪</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">一只专注技术的水怪</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+  <a href="https://github.com/WtMonster/WtMonster.github.io.git" class="github-corner" title="WtMonster GitHub" aria-label="WtMonster GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://wtmonster.github.io/2024/09/05/2024-09-05-loom-virtual-threads/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="WtMonster">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="大水怪">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Loom(虚拟线程)相关
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2024-09-05 00:00:00" itemprop="dateCreated datePublished" datetime="2024-09-05T00:00:00+08:00">2024-09-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2025-09-10 00:00:00" itemprop="dateModified" datetime="2025-09-10T00:00:00+08:00">2025-09-10</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">Views: </span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>JDK21的 虚拟线程 目前存在许多严重bug，尽量不要在可靠性要求较高的服务中使用！</p>
+<h1 id="简单介绍"><a href="#简单介绍" class="headerlink" title="简单介绍"></a>简单介绍</h1><p>虚拟线程使用一个专用的，FIFO模式下的ForkJoin线程池（parallelStream使用的是LIFO模式）。</p>
+<span id="more"></span>
+
+
+<p>它的并行度就是承载虚拟线程的平台线程数，默认与可用核心数相等，也可以使用参数 jdk.virtualThreadScheduler.parallelism 来调整。</p>
+<h1 id="部分实现细节"><a href="#部分实现细节" class="headerlink" title="部分实现细节"></a>部分实现细节</h1><p><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1Ub4y1M7L3/?share_source=copy_web&vd_source=d30c780580db9da56e2e4f9fa6acf1a5">[JVMLS][精翻+个人补充说明]虚拟线程Continuation实现原理 </a>- 原视频 <a target="_blank" rel="noopener" href="https://inside.java/2023/08/26/continuations-under-the-covers/">https://inside.java/2023/08/26/continuations-under-the-covers/</a></p>
+<h1 id="推荐资料"><a href="#推荐资料" class="headerlink" title="推荐资料"></a>推荐资料</h1><p>以下资料主要是对java虚拟线程的设计和思考，具体实现以jdk为准</p>
+<p><a target="_blank" rel="noopener" href="https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html">https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html</a></p>
+<p><a target="_blank" rel="noopener" href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html</a></p>
+<p><a target="_blank" rel="noopener" href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html</a></p>
+<p><a target="_blank" rel="noopener" href="https://inside.java/2021/05/10/networking-io-with-virtual-threads/">https://inside.java/2021/05/10/networking-io-with-virtual-threads/</a></p>
+<p><a target="_blank" rel="noopener" href="https://inside.java/2020/08/07/loom-performance/">https://inside.java/2020/08/07/loom-performance/</a></p>
+<p><a target="_blank" rel="noopener" href="https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads">https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads</a></p>
+<p>如果对异步发展史感兴趣，可以观看 <a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1Fu4m1K7xb/?share_source=copy_web&vd_source=d30c780580db9da56e2e4f9fa6acf1a5">【[Devoxx2023]深入理解Java异步编程发展历史-从线程到响应式再到虚拟线程】 </a>-  原视频 <a target="_blank" rel="noopener" href="https://youtu.be/1zSF1259s6w?si=tJGrNK-Uh6Hgw4B9">https://youtu.be/1zSF1259s6w?si=tJGrNK-Uh6Hgw4B9</a></p>
+<h1 id="风险"><a href="#风险" class="headerlink" title="风险"></a>风险</h1><p>虚拟线程支持ThreadLocal和synchronized，但是存在一些缺陷，有一些问题需要我们额外注意</p>
+<h2 id="1-绑定问题"><a href="#1-绑定问题" class="headerlink" title="1.绑定问题"></a>1.绑定问题</h2><ol>
+<li><p>虚拟线程执行时 在  <code>synchronized</code>  块或方法中执行代码时，会 与平台线程绑定（同步块内，以及等待同步锁都会pin），因此需要使用 ReentrantLock替代（未来有望从底层解决-目前已经有相关JEP，会在JDK24上 <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/491">https://openjdk.org/jeps/491 </a>）</p>
+</li>
+<li><p>虚拟线程执行native代码或外来函数（ <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/424">JEP424 </a>）时是无法被中止的（无法从底层解决，目前典型的是类初始化）。</p>
+</li>
+</ol>
+<h3 id="故障实例"><a href="#故障实例" class="headerlink" title="故障实例"></a>故障实例</h3><h4 id="1-P1-死锁（这块风险在JEP中实际上被低估了）"><a href="#1-P1-死锁（这块风险在JEP中实际上被低估了）" class="headerlink" title="1[P1].死锁（这块风险在JEP中实际上被低估了）"></a>1[P1].死锁（这块风险在JEP中实际上被低估了）</h4><h5 id="1-最经典场景（大部分死锁本质都是这类问题）"><a href="#1-最经典场景（大部分死锁本质都是这类问题）" class="headerlink" title="1.最经典场景（大部分死锁本质都是这类问题）"></a>1.最经典场景（大部分死锁本质都是这类问题）</h5><p>这个问题触发概率高，而且影响大，目前已经有许多第三方开源组件都出现了这个问题</p>
+<p><a target="_blank" rel="noopener" href="https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/">https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/ </a>（这里的分析实际上有点问题，但是无伤大雅，下面会说到）</p>
+<p><a target="_blank" rel="noopener" href="https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html">https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html</a></p>
+<p><strong>复现代码</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">10</span>; i++) &#123;</span><br><span class="line">    Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">        System.out.println(Thread.currentThread() + <span class="string">&quot;: Before synchronized block&quot;</span>);</span><br><span class="line">        <span class="keyword">synchronized</span> (Main.class) &#123;</span><br><span class="line">            System.out.println(Thread.currentThread() + <span class="string">&quot;: Inside synchronized block&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>原理分析</strong></p>
+<p>大体原理可以参考上面的这个讨论内容</p>
+<p><a target="_blank" rel="noopener" href="https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/">https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/</a></p>
+<p><strong>代码可以简化为</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">1</span>; i++) &#123;</span><br><span class="line">    Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">                         doSthWithLock();</span><br><span class="line">        <span class="keyword">synchronized</span> (Main.class) &#123;</span><br><span class="line">                                doSthWithLock()</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doSthWithLock</span><span class="params">()</span> &#123;</span><br><span class="line">        lock.lock();</span><br><span class="line">                <span class="comment">// doSomeThing</span></span><br><span class="line">        lock.unlock();</span><br><span class="line">    &#125; </span><br></pre></td></tr></table></figure>
+
+<p>但是帖子里说到：</p>
+<p>这里的分析略有偏差。如果 [#30]能得到锁的话，说明已经开始运行了，如果它没有yield让出平台线程的话应该是会执行到释放锁逻辑的，所以这个说法应该是不太准确的。</p>
+<p>这里我们取这两个阻塞在System.out.println方法上的线程进行分析，即[#26]（阻塞在同步代码块内部），[#30]（阻塞在同步代码块外部）。</p>
+<p>Lock内部实现的AQS使用 FIFO 队列来进行线程的排队进行资源抢占（对于已经在队列中的线程来说无论是公平锁还是非公平锁都是遵循FIFO的）。</p>
+<p>这个死锁的场景实际上是FIFO队列中， [#30]排在[#26]前面，而当有一个线程执行完同步块外部的方法释放锁时，会将队列前面的Node，即[#30]进行unpark，然后自身马上停靠在synchronized同步块上被绑定</p>
+<p>此时其他虚拟线程都在pinned状态，占用了所有平台线程（假设8核，即7个线程阻塞在同步块的锁上，1个线程阻塞在同步块内部的锁上）</p>
+<p>因此这个unpark是无效的，[#30]此时没有平台线程可以拿来绑定，因此也就无法上锁，而[#26]又由于排在[#30]后面而无法得到unpark通知，因此死锁。</p>
+<p>对于以上分析，我们可以通过debug来佐证</p>
+<p>1.首先验证锁的情况，可以看到锁的确是并没有被抢占到的</p>
+<p>2.当前AQS队列中#32排在#25前面，而#32阻塞在同步块外部的lock上，而#25阻塞在同步块内部的lock上，其他虚拟线程都在同步块上被绑定着</p>
+<p>vt.json</p>
+<p>如果摒弃ReentrantLock的影响，实际状态可以简化为类似以下代码情况</p>
+<p>下面情况需要只有一个载体线程，即 -Djdk.virtualThreadScheduler.parallelism=1,另外需要模块化参数–add-opens java.base/jdk.internal.misc=ALL-UNNAMED</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.internal.misc.VirtualThreads;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestThreadDeadLock</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> <span class="type">int</span> <span class="variable">vt1state</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">static</span> <span class="type">int</span> <span class="variable">vt2state</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">        <span class="type">Thread</span> <span class="variable">vt1</span> <span class="operator">=</span> Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">            VirtualThreads.park();</span><br><span class="line">            vt1state++;</span><br><span class="line">        &#125;);</span><br><span class="line">        <span class="comment">// 等待t1进入park</span></span><br><span class="line">        <span class="keyword">while</span> (!Thread.State.WAITING.equals(vt1.getState())) &#123;</span><br><span class="line">            Thread.onSpinWait();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="type">Thread</span> <span class="variable">vt2</span> <span class="operator">=</span> Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">            <span class="comment">// 唤醒t1</span></span><br><span class="line">            VirtualThreads.unpark(vt1);</span><br><span class="line">            <span class="comment">// 唤醒t1后立即pin住当前唯一的载体线程</span></span><br><span class="line">            syncPark();</span><br><span class="line">            vt2state++;</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">            Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">            System.out.println(<span class="string">&quot;vt1state:&quot;</span> + vt1state + <span class="string">&quot; vt2state: &quot;</span> + vt2state);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title function_">syncPark</span><span class="params">()</span> &#123;</span><br><span class="line">        VirtualThreads.park();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行后输出应该如下，vt1被unpark也无法执行到vt1state++的代码</p>
+<p><strong>相关问题</strong></p>
+<p><a target="_blank" rel="noopener" href="https://bugs.openjdk.org/browse/JDK-8320211">https://bugs.openjdk.org/browse/JDK-8320211</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html">https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.reddit.com/r/java/comments/17xkkoc/java_virtual_threads_pitfalls_to_look_out_for/">https://www.reddit.com/r/java/comments/17xkkoc/java_virtual_threads_pitfalls_to_look_out_for/</a></p>
+<p><strong>conf相关问题（conf上面这几个问题实际上也类似上面提到的）</strong></p>
+<h5 id="2-单线程的死锁（更简单）"><a href="#2-单线程的死锁（更简单）" class="headerlink" title="2.单线程的死锁（更简单）"></a>2.单线程的死锁（更简单）</h5><p>一个简化场景是单线程调度器 vt1拿到了lock A然后遇到io让出 vt2拿到sync然后去拿lock A pin住</p>
+<h5 id="3-Native或FFI导致的死锁"><a href="#3-Native或FFI导致的死锁" class="headerlink" title="3.Native或FFI导致的死锁"></a>3.Native或FFI导致的死锁</h5><p>这个可能比较难发生，但是与同步块的死锁是同理的</p>
+<p>例如在类加载内与类加载外存在ReentrantLock，或者其他资源的抢占，就可能发生。</p>
+<h4 id="2-P2-平台线程资源耗尽"><a href="#2-P2-平台线程资源耗尽" class="headerlink" title="2[P2].平台线程资源耗尽"></a>2[P2].平台线程资源耗尽</h4><p><a target="_blank" rel="noopener" href="https://blog.ydb.tech/how-we-switched-to-java-21-virtual-threads-and-got-deadlock-in-tpc-c-for-postgresql-cca2fe08d70b">How we switched to Java 21 virtual threads and got a deadlock in TPC-C for PostgreSQL</a></p>
+<p><a target="_blank" rel="noopener" href="https://news.ycombinator.com/item?id=39008026">https://news.ycombinator.com/item?id=39008026</a></p>
+<p>这个问题源于线程的pinning,需要注意。</p>
+<h2 id="2-ThreadLocal"><a href="#2-ThreadLocal" class="headerlink" title="2.ThreadLocal"></a>2.ThreadLocal</h2><p>ThreadLocal的问题主要在于线程模型的变化</p>
+<p>没有虚拟线程前我们可以假定线程数不会太多，但是虚拟线程打破了这个限制，一个系统可能同时存在非常多虚拟线程</p>
+<p>因此ThreadLocal的数据量就可能非常非常多，这也就是ThreadLocal的风险所在了。用的时候注意一下就好。</p>
+<p>这里cue一下ScopedValue，有些人可能期望使用ScopedValue完全替代ThreadLocal，其实这是不现实的。</p>
+<p>最典型的就是ThreadLocal用于资源池化的场景，例如jackson中和log4j2中都有这种用法。例如 log4j2的ReusableMessage，现在老实换成普通资源池了  <a target="_blank" rel="noopener" href="https://github.com/apache/logging-log4j2/pull/1401">https://github.com/apache/logging-log4j2/pull/1401 </a>。</p>
+<h3 id="故障实例-1"><a href="#故障实例-1" class="headerlink" title="故障实例"></a>故障实例</h3><h4 id="1-P2-线程变量使用不当导致OOM"><a href="#1-P2-线程变量使用不当导致OOM" class="headerlink" title="1.[P2].线程变量使用不当导致OOM"></a>1.[P2].线程变量使用不当导致OOM</h4><p>但是这个其实跟 ThreadLocal关系不大。。。。</p>
+<h2 id="监控"><a href="#监控" class="headerlink" title="监控"></a>监控</h2><p>可以使用JFR来观察虚拟线程的 在绑定时的挂起情况</p>
+<p><code>jdk.VirtualThreadStart</code>  和  <code>jdk.VirtualThreadEnd</code></p>
+<p><code>记录了虚拟线程的启动和结束，默认关闭</code></p>
+<p>jdk.VirtualThreadPinned</p>
+<p> 表示虚拟线程绑定在平台线程上时，如果阻塞那么会产生这个事件（即没有释放其平台线程），阈值为20ms，默认开启</p>
+<p>jdk.VirtualThreadSubmitFailed</p>
+<p>启动或取消unparking虚拟线程失败，默认开启</p>
+<p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR">https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR</a></p>
+<h3 id="2-【推荐】JFR-EventStream"><a href="#2-【推荐】JFR-EventStream" class="headerlink" title="2.【推荐】JFR EventStream"></a><strong>2.【推荐】JFR EventStream</strong></h3><p>由于 <code>Djdk.tracePinnedThreads本身会导致pin线程（下面会讲到），因此JFR是我们监控pin线程的首选方案</code></p>
+<p><code>但是如果使用通过命令行的方式使用JFR会存在以下问题</code></p>
+<p><code>1. dump文件较大，获取监控数据不方便，难以一次获取长期分析数据</code></p>
+<p><code>2. dump文件需要上机器控制台dump文件，比较麻烦</code></p>
+<p><code>3. 一次只能查看单机数据</code></p>
+<p><code>而如果我们自己去解析JFR文件实际上也能做到持续监控，但是会很麻烦</code></p>
+<p>因此使用JFR event stream来解决这个问题</p>
+<p>JFR的事件流是jdk14引入的特性 <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/349">JEP 349: JFR Event Streaming</a></p>
+<p>这边用的是封装过的监控埋点组件，替换成自己的就好</p>
+<p><strong>JFR event stream</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> com.google.common.collect.Maps;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordedEvent;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordingStream;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.internal.tool.PrettyWriter;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.io.PrintWriter;</span><br><span class="line"><span class="keyword">import</span> java.io.StringWriter;</span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"><span class="keyword">import</span> java.util.Map;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * JFR 事件流监控配置</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@date</span> 2024/04/20</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">JFRMonitorConfiguration</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">LogFacade</span> <span class="variable">LOGGER</span> <span class="operator">=</span> LogFacadeFactory.getLogFacade(JFRMonitorConfiguration.class);</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">TITLE</span> <span class="operator">=</span> <span class="string">&quot;JFR_LOG&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">VIRTUAL_THREAD_PINNED</span> <span class="operator">=</span> <span class="string">&quot;jdk.VirtualThreadPinned&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">JAVA_MONITOR_ENTER</span> <span class="operator">=</span> <span class="string">&quot;jdk.JavaMonitorEnter&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">init</span><span class="params">()</span> &#123;</span><br><span class="line">        Thread.ofVirtual().name(<span class="string">&quot;JFRMonitorThread&quot;</span>).start(JFRMonitorConfiguration::startJFREventStream);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">startJFREventStream</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> (<span class="type">var</span> <span class="variable">rs</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">RecordingStream</span>()) &#123;</span><br><span class="line">            rs.enable(VIRTUAL_THREAD_PINNED).withoutThreshold();</span><br><span class="line">            rs.enable(JAVA_MONITOR_ENTER).withThreshold(Duration.ofMillis(<span class="number">5</span>));</span><br><span class="line">            List.of(VIRTUAL_THREAD_PINNED, JAVA_MONITOR_ENTER)</span><br><span class="line">                    .forEach(name -&gt; rs.onEvent(name, event -&gt; doLog(event, name)));</span><br><span class="line">            rs.start();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doLog</span><span class="params">(RecordedEvent event, String eventName)</span> &#123;</span><br><span class="line">        Map&lt;String, String&gt; tags = Maps.newHashMapWithExpectedSize(<span class="number">2</span>);</span><br><span class="line">        tags.put(<span class="string">&quot;eventName&quot;</span>, eventName);</span><br><span class="line">        tags.put(<span class="string">&quot;isVirtual&quot;</span>, String.valueOf(event.getThread().isVirtual()));</span><br><span class="line">        MetricClient.withTags(tags).recordOne(<span class="string">&quot;JFRDuration&quot;</span>, event.getDuration().toMillis());</span><br><span class="line">        LOGGER.build(TITLE, eventToString(event))</span><br><span class="line">                .tag(<span class="string">&quot;eventName&quot;</span>, eventName)</span><br><span class="line">                .tag(<span class="string">&quot;threadId&quot;</span>, event.getThread().getJavaThreadId())</span><br><span class="line">                .tag(<span class="string">&quot;isVirtual&quot;</span>, event.getThread().isVirtual())</span><br><span class="line">                .warn();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> String <span class="title function_">eventToString</span><span class="params">(RecordedEvent event)</span> &#123;</span><br><span class="line">        <span class="type">StringWriter</span> <span class="variable">s</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">StringWriter</span>();</span><br><span class="line">        <span class="type">PrettyWriter</span> <span class="variable">p</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">PrettyWriter</span>(<span class="keyword">new</span> <span class="title class_">PrintWriter</span>(s));</span><br><span class="line">        p.setStackDepth(<span class="number">64</span>);</span><br><span class="line">        p.print(event);</span><br><span class="line">        p.flush(<span class="literal">true</span>);</span><br><span class="line">        <span class="keyword">return</span> s.toString();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>需要加上以下参数</p>
+<p>1.maven-surefire-plugin 中加上</p>
+<p>--add-opens jdk.jfr/jdk.jfr.internal.tool=ALL-UNNAMED</p>
+<p>2.maven-compiler-plugin 中加上</p>
+<p>&lt;compilerArgs&gt;     &lt;arg&gt;–add-exports&lt;/arg&gt;     &lt;arg&gt;jdk.jfr/jdk.jfr.internal.tool=ALL-UNNAMED&lt;/arg&gt; &lt;/compilerArgs&gt;</p>
+<p>--add-exports jdk.jfr/jdk.jfr.internal.tool=ALL-UNNAMED</p>
+<p>这个事件的触发条件是：线程在pinned情况下出现park操作的耗时超过duration（默认20ms）</p>
+<p>当然，这样依然会有问题存在<br>1.在JFR启动之前，可能有一些其他的pin事件发生了，例如一些类加载，会被忽略掉<br>2.JFR的启动在premain之后，也就是说对于启动期间静态agent premain操作中的pin事件我们也是不知道的<br>对于问题1，我们可以使用命令行启动JFR的方式解决，随后去机器上dump启动期间的jfr记录就好。或者我们可以自定义一个agent，确保jfr监控在其他类加载之前启动。<br>问题2目前是无解的，这是在JVM里写死的<br>当然，如果启动期间有严重问题会直接导致机器启动不起来，并不会造成太大的影响。</p>
+<h3 id="3-jdk-tracePinnedThreads-只能在非生产使用！"><a href="#3-jdk-tracePinnedThreads-只能在非生产使用！" class="headerlink" title="3. jdk.tracePinnedThreads ( 只能在非生产使用！ )"></a><strong>3. <code>jdk.tracePinnedThreads </code></strong><code>( </code><strong><code>只能在非生产使用！ </code></strong><code>)</code></h3><p>当线程固定在平台线程上阻塞时</p>
+<p><code>-Djdk.tracePinnedThreads=full</code>  打印完整的堆栈跟踪，并突出显示本机帧和持有锁的帧。</p>
+<p><code>-Djdk.tracePinnedThreads=short</code>  输出限制为仅有问题的帧。</p>
+<p><code>目前存在以下两个严重bug</code></p>
+<h4 id="bug1（deadlock）-https-bugs-openjdk-org-browse-JDK-8322846"><a href="#bug1（deadlock）-https-bugs-openjdk-org-browse-JDK-8322846" class="headerlink" title="bug1（deadlock）: https://bugs.openjdk.org/browse/JDK-8322846"></a><code>bug1（deadlock）:</code> <a target="_blank" rel="noopener" href="https://bugs.openjdk.org/browse/JDK-8322846"><code>https://bugs.openjdk.org/browse/JDK-8322846</code></a></h4><p><code>这个问题实质上就是lock和sync的嵌套导致的死锁问题， </code><strong><code>bug1已经在jdk21.0.4修复</code></strong></p>
+<ul>
+<li><code>解决</code></li>
+</ul>
+<p><code>可以尝试使用- </code><a target="_blank" rel="noopener" href="http://djdk.io/"><code>Djdk.io </code></a><code>.useMonitors=true来将内部的ReentrantLock替换成使用synchronized，但是这样有饮鸩止渴的意味，不推荐</code></p>
+<h4 id="bug2（假死问题，hang住虚拟机）-https-bugs-openjdk-org-browse-JDK-8325521"><a href="#bug2（假死问题，hang住虚拟机）-https-bugs-openjdk-org-browse-JDK-8325521" class="headerlink" title="bug2（假死问题，hang住虚拟机）: https://bugs.openjdk.org/browse/JDK-8325521"></a><code>bug2（假死问题，hang住虚拟机）: </code><a target="_blank" rel="noopener" href="https://bugs.openjdk.org/browse/JDK-8325521"><code>https://bugs.openjdk.org/browse/JDK-8325521</code></a></h4><p><code>这里对bug2展开说说</code></p>
+<ul>
+<li>根因</li>
+</ul>
+<p>JVM里的JVMTI存在bug，jdk20时就有相关pr（ <a target="_blank" rel="noopener" href="https://github.com/openjdk/jdk/pull/10321%EF%BC%89">https://github.com/openjdk/jdk/pull/10321 </a>） ，应该是漏了部分逻辑，将会在23以后完成修复，原因如下</p>
+<ul>
+<li><code>触发条件</code></li>
+</ul>
+<p>1.开启了参数-Djdk.tracePinnedThreads；<br>2.使用某个内部 agent增强了Runnable；<br>3.在某个内部 agent attach之前没有触发过java.lang.PinnedThreadPrinter类里lambda表达式的加载</p>
+<ul>
+<li>解决（如果不想关闭 -Djdk.tracePinnedThreads ）</li>
+</ul>
+<p>1.关闭JVM里对JVMTI事件的处理 -XX:-DoJVMTIVirtualThreadTransitions</p>
+<p>2.在某个内部 agent attach之前自己手动触发一次pin</p>
+<ul>
+<li>复现代码（参数 -Djdk.attach.allowAttachSelf=true -Djdk.tracePinnedThreads=full ）</li>
+</ul>
+<p><strong>hang JVM复现代码</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> org.example;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.locks.LockSupport;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">TestAgentJVMHang</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException, ClassNotFoundException &#123;</span><br><span class="line">        <span class="comment">// 1. 启动Agent</span></span><br><span class="line">        System.out.println(<span class="string">&quot;Agent loaded&quot;</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 2. 启动VirtualThread park</span></span><br><span class="line">        Thread.ofVirtual().start(TestAgentJVMHang::testPinnedPrinter);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 3. 进行类加载 - hang</span></span><br><span class="line">        Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">        System.out.println(<span class="string">&quot;finished&quot;</span>);</span><br><span class="line">        Class&lt;?&gt; aClass = Class.forName(<span class="string">&quot;org.example.TestAgentJVMHang$TestClass&quot;</span>);</span><br><span class="line">        System.out.println(aClass);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title function_">testPinnedPrinter</span><span class="params">()</span> &#123;</span><br><span class="line">        LockSupport.parkNanos(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">class</span> <span class="title class_">TestClass</span> &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="解决措施"><a href="#解决措施" class="headerlink" title="解决措施"></a>解决措施</h2><ul>
+<li><p>最好的解决方案是官方提供synchronized对虚拟线程的支持（在jdk24中已经实现了适配 <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/491">JEP 491 </a>）</p>
+</li>
+<li><p>尽量从synchronized迁移到ReentrantLock</p>
+</li>
+</ul>
+<h3 id="自动档"><a href="#自动档" class="headerlink" title="自动档"></a>自动档</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">&lt;dependency&gt;</span><br><span class="line">  &lt;groupId&gt;mysql&lt;/groupId&gt;</span><br><span class="line">  &lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;</span><br><span class="line">  &lt;version&gt;<span class="number">8.3</span><span class="number">.0</span>-vt<span class="number">.1</span>&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br><span class="line"></span><br><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;org.apache.httpcomponents.client5&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;httpclient5&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;<span class="number">5.4</span>-alpha2&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;org.apache.httpcomponents.core5&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;httpcore5&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;<span class="number">5.3</span>-alpha2&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;org.apache.httpcomponents.core5&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;httpcore5-h2&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;<span class="number">5.3</span>-alpha2&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br></pre></td></tr></table></figure>
+
+<p>以及以下依赖：</p>
+<h3 id="具体如何更好地适配"><a href="#具体如何更好地适配" class="headerlink" title="具体如何更好地适配"></a>具体如何更好地适配</h3><p>1.可以参考 <a target="_blank" rel="noopener" href="https://dzone.com/articles/relearning-java-thread-primitives">https://dzone.com/articles/relearning-java-thread-primitives </a>，更优雅地使用Lock进行替换<br>2.对于ConcurrentHashMap这类使用ReentrantLock替换需要付出代价（需要在Node上加lock属性，会导致内存膨胀）的场景，可以考虑使用ConcurrentSkipListMap替换（性能略差，但是是无锁的线程安全HashMap实现）<br>3.由于JFR的event并不包含持有Monitor的帧（ <a target="_blank" rel="noopener" href="https://bugs.openjdk.org/browse/JDK-8314591">https://bugs.openjdk.org/browse/JDK-8314591 </a>），因此上线前的排查阶段使用 -Djdk.tracePinnedThreads排查比较方便</p>
+<h3 id="排查时需要关注的场景"><a href="#排查时需要关注的场景" class="headerlink" title="排查时需要关注的场景"></a>排查时需要关注的场景</h3><p>1.sync块内外出现了同一资源的竞争，典型的例如上面的sync块内外出现了对同一lock的抢占，这种可能造成死锁</p>
+<p>2.sync里面有park但是无内外资源竞争的，这种只会影响性能</p>
+<p>3.sync里面没有park操作，这种情况无竞争的情况下无影响，有竞争的情况下会导致性能变差（通过JFR事件jdk.JavaMonitorEnter来观察）</p>
+<p>4.其他绑定问题（Native或FFI代码，例如类加载场景）</p>
+<h1 id="TIPS"><a href="#TIPS" class="headerlink" title="TIPS"></a>TIPS</h1><p><a target="_blank" rel="noopener" href="https://www.javaperformancetuning.com/news/newtips274.shtml">https://www.javaperformancetuning.com/news/newtips274.shtml</a></p>
+<p>虚拟线程不再需要池化，虚拟线程是非常轻量的，随用随建就行。</p>
+<p>但是线程池 <strong>部分思想依然有效</strong>，例如使用线程池的思想控 <strong>制访问资源的并发量</strong>。</p>
+<p>这这种场景线程池内部可能用Semaphore简单地控制并发量，而不需要有复杂的线程管理逻辑</p>
+<p>也就是说虚拟线程池的目的将不再包含资源的复用，而应该只包含一些更轻量的附加控制</p>
+<h1 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h1><h2 id="线程转储"><a href="#线程转储" class="headerlink" title="线程转储"></a>线程转储</h2><p>在jdk21中使用jstack -l [pid] &gt; [file]是拿不到虚拟线程的</p>
+<p>使用idea中的线程转储也获取不到虚拟线程</p>
+<p>原因：虚拟线程数量非常多，原本扁平化的数据结构无法很好地组织线程之间的结构关系，引入结构化并发后更是如此</p>
+<p>方案：</p>
+<p>提供json结构来输出包含虚拟线程的堆栈转储，而不会在原来的线程转储输出中包含虚拟线程</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jcmd &lt;pid&gt; Thread.dump_to_file -format=json &lt;file&gt;</span><br><span class="line"></span><br><span class="line">新版idea也对此提供了一定支持</span><br></pre></td></tr></table></figure>
+
+
+<p>参考</p>
+<p><a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html#GUID-8AEDDBE6-F783-4D77-8786-AC5A79F517C0">Virtual Threads: An Adoption Guide</a></p>
+<p><a target="_blank" rel="noopener" href="https://blog.rockthejvm.com/ultimate-guide-to-java-virtual-threads/">The Ultimate Guide to Java Virtual Threads</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JDK21/" rel="tag"># JDK21</a>
+              <a href="/tags/JVM/" rel="tag"># JVM</a>
+              <a href="/tags/Virtual-Threads/" rel="tag"># Virtual Threads</a>
+              <a href="/tags/Loom/" rel="tag"># Loom</a>
+              <a href="/tags/JFR/" rel="tag"># JFR</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2024/08/18/2024-08-18-jdk21-upgrade-notes/" rel="prev" title="JDK21升级记录">
+      <i class="fa fa-chevron-left"></i> JDK21升级记录
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/09/22/2024-09-22-jfr-practice/" rel="next" title="JFR实战教程">
+      JFR实战教程 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">简单介绍</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%83%A8%E5%88%86%E5%AE%9E%E7%8E%B0%E7%BB%86%E8%8A%82"><span class="nav-number">2.</span> <span class="nav-text">部分实现细节</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8E%A8%E8%8D%90%E8%B5%84%E6%96%99"><span class="nav-number">3.</span> <span class="nav-text">推荐资料</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%A3%8E%E9%99%A9"><span class="nav-number">4.</span> <span class="nav-text">风险</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E7%BB%91%E5%AE%9A%E9%97%AE%E9%A2%98"><span class="nav-number">4.1.</span> <span class="nav-text">1.绑定问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%85%E9%9A%9C%E5%AE%9E%E4%BE%8B"><span class="nav-number">4.1.1.</span> <span class="nav-text">故障实例</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-P1-%E6%AD%BB%E9%94%81%EF%BC%88%E8%BF%99%E5%9D%97%E9%A3%8E%E9%99%A9%E5%9C%A8JEP%E4%B8%AD%E5%AE%9E%E9%99%85%E4%B8%8A%E8%A2%AB%E4%BD%8E%E4%BC%B0%E4%BA%86%EF%BC%89"><span class="nav-number">4.1.1.1.</span> <span class="nav-text">1[P1].死锁（这块风险在JEP中实际上被低估了）</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1-%E6%9C%80%E7%BB%8F%E5%85%B8%E5%9C%BA%E6%99%AF%EF%BC%88%E5%A4%A7%E9%83%A8%E5%88%86%E6%AD%BB%E9%94%81%E6%9C%AC%E8%B4%A8%E9%83%BD%E6%98%AF%E8%BF%99%E7%B1%BB%E9%97%AE%E9%A2%98%EF%BC%89"><span class="nav-number">4.1.1.1.1.</span> <span class="nav-text">1.最经典场景（大部分死锁本质都是这类问题）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2-%E5%8D%95%E7%BA%BF%E7%A8%8B%E7%9A%84%E6%AD%BB%E9%94%81%EF%BC%88%E6%9B%B4%E7%AE%80%E5%8D%95%EF%BC%89"><span class="nav-number">4.1.1.1.2.</span> <span class="nav-text">2.单线程的死锁（更简单）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#3-Native%E6%88%96FFI%E5%AF%BC%E8%87%B4%E7%9A%84%E6%AD%BB%E9%94%81"><span class="nav-number">4.1.1.1.3.</span> <span class="nav-text">3.Native或FFI导致的死锁</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-P2-%E5%B9%B3%E5%8F%B0%E7%BA%BF%E7%A8%8B%E8%B5%84%E6%BA%90%E8%80%97%E5%B0%BD"><span class="nav-number">4.1.1.2.</span> <span class="nav-text">2[P2].平台线程资源耗尽</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-ThreadLocal"><span class="nav-number">4.2.</span> <span class="nav-text">2.ThreadLocal</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%85%E9%9A%9C%E5%AE%9E%E4%BE%8B-1"><span class="nav-number">4.2.1.</span> <span class="nav-text">故障实例</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-P2-%E7%BA%BF%E7%A8%8B%E5%8F%98%E9%87%8F%E4%BD%BF%E7%94%A8%E4%B8%8D%E5%BD%93%E5%AF%BC%E8%87%B4OOM"><span class="nav-number">4.2.1.1.</span> <span class="nav-text">1.[P2].线程变量使用不当导致OOM</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%91%E6%8E%A7"><span class="nav-number">4.3.</span> <span class="nav-text">监控</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E3%80%90%E6%8E%A8%E8%8D%90%E3%80%91JFR-EventStream"><span class="nav-number">4.3.1.</span> <span class="nav-text">2.【推荐】JFR EventStream</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-jdk-tracePinnedThreads-%E5%8F%AA%E8%83%BD%E5%9C%A8%E9%9D%9E%E7%94%9F%E4%BA%A7%E4%BD%BF%E7%94%A8%EF%BC%81"><span class="nav-number">4.3.2.</span> <span class="nav-text">3. jdk.tracePinnedThreads ( 只能在非生产使用！ )</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#bug1%EF%BC%88deadlock%EF%BC%89-https-bugs-openjdk-org-browse-JDK-8322846"><span class="nav-number">4.3.2.1.</span> <span class="nav-text">bug1（deadlock）: https:&#x2F;&#x2F;bugs.openjdk.org&#x2F;browse&#x2F;JDK-8322846</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#bug2%EF%BC%88%E5%81%87%E6%AD%BB%E9%97%AE%E9%A2%98%EF%BC%8Chang%E4%BD%8F%E8%99%9A%E6%8B%9F%E6%9C%BA%EF%BC%89-https-bugs-openjdk-org-browse-JDK-8325521"><span class="nav-number">4.3.2.2.</span> <span class="nav-text">bug2（假死问题，hang住虚拟机）: https:&#x2F;&#x2F;bugs.openjdk.org&#x2F;browse&#x2F;JDK-8325521</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E6%8E%AA%E6%96%BD"><span class="nav-number">4.4.</span> <span class="nav-text">解决措施</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E6%A1%A3"><span class="nav-number">4.4.1.</span> <span class="nav-text">自动档</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B7%E4%BD%93%E5%A6%82%E4%BD%95%E6%9B%B4%E5%A5%BD%E5%9C%B0%E9%80%82%E9%85%8D"><span class="nav-number">4.4.2.</span> <span class="nav-text">具体如何更好地适配</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5%E6%97%B6%E9%9C%80%E8%A6%81%E5%85%B3%E6%B3%A8%E7%9A%84%E5%9C%BA%E6%99%AF"><span class="nav-number">4.4.3.</span> <span class="nav-text">排查时需要关注的场景</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#TIPS"><span class="nav-number">5.</span> <span class="nav-text">TIPS</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%B6%E4%BB%96"><span class="nav-number">6.</span> <span class="nav-text">其他</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E8%BD%AC%E5%82%A8"><span class="nav-number">6.1.</span> <span class="nav-text">线程转储</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="WtMonster"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">WtMonster</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">11</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/WtMonster" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;WtMonster" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://blog.csdn.net/qq_31923745" title="CSDN → https:&#x2F;&#x2F;blog.csdn.net&#x2F;qq_31923745" rel="noopener" target="_blank"><i class="fa fa-crosshairs fa-fw"></i>CSDN</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/17713895/wtmonster?tab=questions" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;17713895&#x2F;wtmonster?tab&#x3D;questions" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WtMonster</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a>
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script data-pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="Total Visitors">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="Total Views">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script color='' opacity='' zIndex='' count='' src="/lib/canvas-nest/canvas-nest-nomobile.min.js"></script>
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '94910566d35d27c13869',
+      clientSecret: '43e3747775f4ad48db2916b7c53987fd5431e7e6',
+      repo        : 'wtmonster.github.io',
+      owner       : 'WtMonster',
+      admin       : ['WtMonster'],
+      id          : '944a794b7610a5ae552038232b723bad',
+        language: 'en',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
