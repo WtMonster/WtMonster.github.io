@@ -992,33 +992,111 @@
       </tags>
   </entry>
   <entry>
-    <title>JDK21升级时的一些意外收获</title>
-    <url>/2024/10/28/2024-10-28-jdk21-unexpected-findings/</url>
-    <content><![CDATA[<h1 id="某个内部-agent"><a href="#某个内部-agent" class="headerlink" title="某个内部 agent"></a>某个内部 agent</h1><p>这个问题实际上与jdk21无关，是某个内部 agent自身存在的问题，哪个jdk版本都存在，只不过不通过分析工具无法看出来，升级时无意发现并解决了。</p>
-<h2 id="发现问题"><a href="#发现问题" class="headerlink" title="发现问题"></a>发现问题</h2><p>在升级时使用JFR分析应用发现启动时大量异常：java.lang.NoClassDefFoundError，后续应用运行期间也陆陆续续有报错。或者说只要进行类加载就会报这个错。</p>
+    <title>JDK21-25重要特性解读</title>
+    <url>/2024/10/05/2024-10-05-jdk21-25-features/</url>
+    <content><![CDATA[<h1 id="Loom（虚拟线程）"><a href="#Loom（虚拟线程）" class="headerlink" title="Loom（虚拟线程）"></a>Loom（虚拟线程）</h1><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+</table>
 <span id="more"></span>
 
-
-<p>但是这部分异常是会被吞掉的，也就是说我们 <strong>无法通过日志等方式看到这一部分开销，可能这也就是为什么它一直没有被发现</strong>。</p>
-<p>具体报错代码在</p>
-<p>从报错频率来看初步判断是由于Agent工具类初始化失败导致的，因为虚拟机只会进行一次类加载，如果加载失败了后续每次使用都会报错。</p>
-<p>找到第一次初始化失败的调用堆栈，可以看到异常出现在Agent工具类的第45行</p>
-<p>也就是说实际上是 <strong>日志门面类加载失败</strong>，导致了 <strong>Agent工具类的初始化失败</strong>。</p>
-<p>那么为什么日志门面类会初始化失败呢？从报错堆栈来看实际上并没有进入到日志门面类的初始化逻辑中，因此基本可以确认是根本 <strong>找不到日志门面类这个类</strong></p>
-<p>另外从调用栈中可以看出来，Agent工具类在前面已经被使用过了，但是在后面却重新初始化了，这只有一种可能性，那就是调用链路中 <strong>切换了类加载器</strong>。</p>
-<p>我们使用Arthas查看类加载情况，主要关注三个类Agent工具类、Transformer类、日志门面类</p>
-<p>sc -d org.slf4j.日志门面类</p>
-<p>对比可以看出来，日志门面类没有被AppClassloader加载过。</p>
-<p>我们可以通过入口类，也就是Transformer类来看。</p>
-<p>由于某个内部 agent是通过动态Agent进行增强，因此我们找到Agent的入口类，也就是Agent入口类来看到逻辑</p>
-<p>由于这是agent里面的代码，因此都是使用AppClassLoader进行的类加载，而在某个内部 agent的包里面是没有打包日志门面类的依赖的，那自然就找不到日志门面类这个类了。</p>
-<p>那某个内部 agent为何可以正常运作呢？</p>
-<p>查看代码发现在点火流程中也new了一个Transformer类，因为这是正常点火流程里面的，因此类自然是由应用容器的webAppClassLoader所管理的，因此可以正常加载到日志门面类等相关类</p>
-<p>（上面的inst是通过反射拿到了agent内部回调的Instrumentation对象，因此相对于绕过了类加载器的影响）</p>
-<p>所以这就导致Instrumentation中实际上存在两个Transformer类</p>
-<p>一个是由AppClassLoader加载的无效的Transformer类，每次类加载都会经过这个Transformer类都会报错；</p>
-<p>另一个是由应用容器加载的实际生效的Transformer类。</p>
-<h2 id="解决问题"><a href="#解决问题" class="headerlink" title="解决问题"></a>解决问题</h2><p>将Agent入口类中的Transformer类删掉就好了。</p>
+<p>| 24      | <a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a> | 解决了虚拟线程在 synchronized上绑定的问题，虚拟线程从此可以大规模使用了（但类加载依然存在绑定问题，有极小概率死锁） |<br>| 25      | <a href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a>                               | 引入了一种全新的，基于显式作用域管理的值传递方式                                         |</p>
+<h1 id="JVM相关"><a href="#JVM相关" class="headerlink" title="JVM相关"></a>JVM相关</h1><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
+<td>完成了Lilliput项目的第一阶段，将对象头从128位减小到了64位，下一阶段目标是减少到32位。据阿里之前的反馈，约节省7-8%的内存，具体效果和项目本身关系比较大。</td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
+<td>分代ZGC正式生产可用了，但目前还没有specjbb与其他GC的对比数据<br></td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
+<td>支持自定义方法维度的全量耗时tracing</td>
+</tr>
+<tr>
+<td>23<br>24</td>
+<td><a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a><br><a href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
+<td>ZGC以后只有分代模式了，实测认为绝大部分情况下分代ZGC优于单代ZGC（少部分不符合分代假说的极端情况除外，例如sofa jraft的ringbuffer）<br></td>
+</tr>
+</tbody></table>
+<h1 id="语法-amp-core-lib"><a href="#语法-amp-core-lib" class="headerlink" title="语法&amp;core-lib"></a>语法&amp;core-lib</h1><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/485">JEP 485: Stream Gatherers</a></td>
+<td>提供了更灵活的stream流处理方式，并且提供了一些内置拓展<br><a href="https://inside.java/2025/04/03/javaone-stream-gatherers/">【inside.java】javaone-stream-gatherers</a></td>
+</tr>
+<tr>
+<td>22</td>
+<td><a href="https://openjdk.org/jeps/456">JEP 456: Unnamed Variables &amp; Patterns</a></td>
+<td>可以使用下划线’_‘来命名未使用的变量</td>
+</tr>
+<tr>
+<td>23</td>
+<td><a href="https://openjdk.org/jeps/467">JEP 467: Markdown Documentation Comments</a></td>
+<td>注释支持Markdown格式</td>
+</tr>
+</tbody></table>
+<h1 id="底层库"><a href="#底层库" class="headerlink" title="底层库"></a>底层库</h1><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>22</td>
+<td><a href="https://openjdk.org/jeps/454">JEP 454: Foreign Function &amp; Memory API</a></td>
+<td>提供标准的FFM API，用于调用其他语言的代码以及本地内存管理</td>
+</tr>
+<tr>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/484">JEP 484: Class-File API</a></td>
+<td>提供用于解析、生成和转换 Java 类文件的标准 API</td>
+</tr>
+</tbody></table>
+<h1 id="Leyden-相关"><a href="#Leyden-相关" class="headerlink" title="Leyden 相关"></a>Leyden 相关</h1><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></td>
+<td>存储类加载和链接的训练数据，但当前只支持jdk内置的class loader： System, Extension, &amp; Boot loaders</td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></td>
+<td>存储方法的调用数据（方法执行次数等），以便JIT了解方法的执行情况，可以直接进行对应层级的编译优化</td>
+</tr>
+</tbody></table>
 ]]></content>
       <categories>
         <category>Java</category>
@@ -1027,7 +1105,65 @@
         <tag>Java</tag>
         <tag>JDK21</tag>
         <tag>JVM</tag>
-        <tag>JFR</tag>
+        <tag>JEP</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>JDK25-Leyden</title>
+    <url>/2024/10/20/2024-10-20-jdk25-leyden/</url>
+    <content><![CDATA[<h1 id="Leyden相关进展"><a href="#Leyden相关进展" class="headerlink" title="Leyden相关进展"></a>Leyden相关进展</h1><h2 id="DONE"><a href="#DONE" class="headerlink" title="DONE"></a>DONE</h2><p><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
+<p><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a>（暂时用处不大，其实就是把启动）</p>
+<span id="more"></span>
+
+
+<p><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
+<p><a href="https://bugs.openjdk.org/browse/JDK-8352437">Support –add-exports with -XX:+AOTClassLinking</a></p>
+<p><a href="https://bugs.openjdk.org/browse/JDK-8352003">Support –add-opens with -XX:+AOTClassLinking</a></p>
+<h2 id="DOING"><a href="#DOING" class="headerlink" title="DOING"></a>DOING</h2><p><a href="https://openjdk.org/jeps/516">Ahead-of-Time Object Caching with Any GC</a></p>
+<p><a href="https://openjdk.org/jeps/8335368">JEP draft: Ahead-of-Time Code Compilation</a></p>
+<h1 id="核心JEP解读"><a href="#核心JEP解读" class="headerlink" title="核心JEP解读"></a>核心JEP解读</h1><h2 id="JEP-483"><a href="#JEP-483" class="headerlink" title="JEP 483"></a>JEP 483</h2><p><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
+<p>存储类加载和链接的训练数据，但当前只支持jdk内置的class loader：System, Extension, &amp; Boot loaders</p>
+<p>tips：</p>
+<p>对lambda等的优化会比较大</p>
+<h2 id="JEP-515"><a href="#JEP-515" class="headerlink" title="JEP 515"></a>JEP 515</h2><p><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
+<p>存储方法的调用数据（方法执行次数等），以便JIT了解方法的执行情况，可以直接进行对应层级的编译优化</p>
+<p>tips：</p>
+<p>这样做需要注意，由于JIT已知方法的执行情况，理想情况下可以认为热点path代码可以在首次触达时即完成JIT优化，这对CPU资源的开销可能会比较大</p>
+<p>也就是说，如果直接接入峰值流量，可能启动初期消耗的CPU资源会较高，可能依然需要慢启动的流程（不过流量放大的速度可以比现在快很多）</p>
+<p>未来<a href="https://openjdk.org/jeps/8335368">JEP draft: Ahead-of-Time Code Compilation</a>完成后，上述问题会得到解决</p>
+<h2 id="JEP514"><a href="#JEP514" class="headerlink" title="JEP514"></a>JEP514</h2><p><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></p>
+<p>作用是把开始训练/生成训练数据的两个命令行合并成一个命令（在应用结束的时候起一个子进程运行生成训练数据的命令）</p>
+<p>目前存在一些问题，生成训练数据时候的启动参数是和启动应用时一样的。但在应用容器这样的启动方式时，可能存在像-Dcom.sun.management.jmxremote.port=1099这样的启动参数，会因端口冲突导致生成训练数据的步骤失败。</p>
+<h1 id="目前最大的问题"><a href="#目前最大的问题" class="headerlink" title="目前最大的问题"></a>目前最大的问题</h1><h2 id="只支持java内置的classloader"><a href="#只支持java内置的classloader" class="headerlink" title="只支持java内置的classloader"></a>只支持java内置的classloader</h2><p>BootClassLoader</p>
+<p><a href="https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/lang/ClassLoader.html#getPlatformClassLoader()">PlatformClassLoader</a></p>
+<p><a href="https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/lang/ClassLoader.html#getSystemClassLoader()">AppClassLoader</a></p>
+<p>可能会在未来放开这一限制</p>
+<p>Spring所做的jar包展开本质上也是更换了classLoader（非nestedJar的情况下不再需要使用自定义的classLoader）</p>
+<h2 id="不支持ZGC"><a href="#不支持ZGC" class="headerlink" title="不支持ZGC"></a>不支持ZGC</h2><p>未来会支持</p>
+<h1 id="Leyden和Native-Image的区别"><a href="#Leyden和Native-Image的区别" class="headerlink" title="Leyden和Native Image的区别"></a>Leyden和Native Image的区别</h1><p>Leyden相比Native Image而言，不会砍掉JVM的动态性。对开发而言可以做到基本无感。</p>
+<p><strong>以下是一些详细说明：</strong></p>
+<p>Leyden项目不打算直接合并GraalVM的工作，而是参考一部分Graal思路的同时，在项目开始时保留一部分运行时特征</p>
+<p><a href="https://www.infoq.com/news/2022/06/project-leyden-delays-aot/">https://www.infoq.com/news/2022/06/project-leyden-delays-aot/</a></p>
+<p>这种转向在Leyden项目的一部分问答中有所体现</p>
+<p><a href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></p>
+<p><a href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></p>
+<p>官方描述中也可以看出</p>
+<p><a href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></p>
+<p>其他</p>
+<p><a href="https://vived.io/how-committing-graalvm-to-openjdk-changes-the-rules-for-project-leyden-jvm-weekly-110/">https://vived.io/how-committing-graalvm-to-openjdk-changes-the-rules-for-project-leyden-jvm-weekly-110/</a></p>
+<h1 id="需要关注的工作"><a href="#需要关注的工作" class="headerlink" title="需要关注的工作"></a>需要关注的工作</h1><p>jar包展开</p>
+<p><a href="https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation">https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation</a></p>
+<p><a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></p>
+<p><a href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></p>
+]]></content>
+      <categories>
+        <category>Java</category>
+      </categories>
+      <tags>
+        <tag>Java</tag>
+        <tag>JVM</tag>
+        <tag>Leyden</tag>
+        <tag>AOT</tag>
       </tags>
   </entry>
   <entry>
@@ -1216,181 +1352,6 @@
       <tags>
         <tag>MySQL</tag>
         <tag>索引</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>JDK21-25重要特性解读</title>
-    <url>/2024/10/05/2024-10-05-jdk21-25-features/</url>
-    <content><![CDATA[<h1 id="Loom（虚拟线程）"><a href="#Loom（虚拟线程）" class="headerlink" title="Loom（虚拟线程）"></a>Loom（虚拟线程）</h1><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-</table>
-<span id="more"></span>
-
-<p>| 24      | <a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a> | 解决了虚拟线程在 synchronized上绑定的问题，虚拟线程从此可以大规模使用了（但类加载依然存在绑定问题，有极小概率死锁） |<br>| 25      | <a href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a>                               | 引入了一种全新的，基于显式作用域管理的值传递方式                                         |</p>
-<h1 id="JVM相关"><a href="#JVM相关" class="headerlink" title="JVM相关"></a>JVM相关</h1><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
-<td>完成了Lilliput项目的第一阶段，将对象头从128位减小到了64位，下一阶段目标是减少到32位。据阿里之前的反馈，约节省7-8%的内存，具体效果和项目本身关系比较大。</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
-<td>分代ZGC正式生产可用了，但目前还没有specjbb与其他GC的对比数据<br></td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
-<td>支持自定义方法维度的全量耗时tracing</td>
-</tr>
-<tr>
-<td>23<br>24</td>
-<td><a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a><br><a href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
-<td>ZGC以后只有分代模式了，实测认为绝大部分情况下分代ZGC优于单代ZGC（少部分不符合分代假说的极端情况除外，例如sofa jraft的ringbuffer）<br></td>
-</tr>
-</tbody></table>
-<h1 id="语法-amp-core-lib"><a href="#语法-amp-core-lib" class="headerlink" title="语法&amp;core-lib"></a>语法&amp;core-lib</h1><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/485">JEP 485: Stream Gatherers</a></td>
-<td>提供了更灵活的stream流处理方式，并且提供了一些内置拓展<br><a href="https://inside.java/2025/04/03/javaone-stream-gatherers/">【inside.java】javaone-stream-gatherers</a></td>
-</tr>
-<tr>
-<td>22</td>
-<td><a href="https://openjdk.org/jeps/456">JEP 456: Unnamed Variables &amp; Patterns</a></td>
-<td>可以使用下划线’_‘来命名未使用的变量</td>
-</tr>
-<tr>
-<td>23</td>
-<td><a href="https://openjdk.org/jeps/467">JEP 467: Markdown Documentation Comments</a></td>
-<td>注释支持Markdown格式</td>
-</tr>
-</tbody></table>
-<h1 id="底层库"><a href="#底层库" class="headerlink" title="底层库"></a>底层库</h1><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>22</td>
-<td><a href="https://openjdk.org/jeps/454">JEP 454: Foreign Function &amp; Memory API</a></td>
-<td>提供标准的FFM API，用于调用其他语言的代码以及本地内存管理</td>
-</tr>
-<tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/484">JEP 484: Class-File API</a></td>
-<td>提供用于解析、生成和转换 Java 类文件的标准 API</td>
-</tr>
-</tbody></table>
-<h1 id="Leyden-相关"><a href="#Leyden-相关" class="headerlink" title="Leyden 相关"></a>Leyden 相关</h1><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></td>
-<td>存储类加载和链接的训练数据，但当前只支持jdk内置的class loader： System, Extension, &amp; Boot loaders</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></td>
-<td>存储方法的调用数据（方法执行次数等），以便JIT了解方法的执行情况，可以直接进行对应层级的编译优化</td>
-</tr>
-</tbody></table>
-]]></content>
-      <categories>
-        <category>Java</category>
-      </categories>
-      <tags>
-        <tag>Java</tag>
-        <tag>JDK21</tag>
-        <tag>JVM</tag>
-        <tag>JEP</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>JDK25-Leyden</title>
-    <url>/2024/10/20/2024-10-20-jdk25-leyden/</url>
-    <content><![CDATA[<h1 id="Leyden相关进展"><a href="#Leyden相关进展" class="headerlink" title="Leyden相关进展"></a>Leyden相关进展</h1><h2 id="DONE"><a href="#DONE" class="headerlink" title="DONE"></a>DONE</h2><p><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
-<p><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a>（暂时用处不大，其实就是把启动）</p>
-<span id="more"></span>
-
-
-<p><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
-<p><a href="https://bugs.openjdk.org/browse/JDK-8352437">Support –add-exports with -XX:+AOTClassLinking</a></p>
-<p><a href="https://bugs.openjdk.org/browse/JDK-8352003">Support –add-opens with -XX:+AOTClassLinking</a></p>
-<h2 id="DOING"><a href="#DOING" class="headerlink" title="DOING"></a>DOING</h2><p><a href="https://openjdk.org/jeps/516">Ahead-of-Time Object Caching with Any GC</a></p>
-<p><a href="https://openjdk.org/jeps/8335368">JEP draft: Ahead-of-Time Code Compilation</a></p>
-<h1 id="核心JEP解读"><a href="#核心JEP解读" class="headerlink" title="核心JEP解读"></a>核心JEP解读</h1><h2 id="JEP-483"><a href="#JEP-483" class="headerlink" title="JEP 483"></a>JEP 483</h2><p><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
-<p>存储类加载和链接的训练数据，但当前只支持jdk内置的class loader：System, Extension, &amp; Boot loaders</p>
-<p>tips：</p>
-<p>对lambda等的优化会比较大</p>
-<h2 id="JEP-515"><a href="#JEP-515" class="headerlink" title="JEP 515"></a>JEP 515</h2><p><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
-<p>存储方法的调用数据（方法执行次数等），以便JIT了解方法的执行情况，可以直接进行对应层级的编译优化</p>
-<p>tips：</p>
-<p>这样做需要注意，由于JIT已知方法的执行情况，理想情况下可以认为热点path代码可以在首次触达时即完成JIT优化，这对CPU资源的开销可能会比较大</p>
-<p>也就是说，如果直接接入峰值流量，可能启动初期消耗的CPU资源会较高，可能依然需要慢启动的流程（不过流量放大的速度可以比现在快很多）</p>
-<p>未来<a href="https://openjdk.org/jeps/8335368">JEP draft: Ahead-of-Time Code Compilation</a>完成后，上述问题会得到解决</p>
-<h2 id="JEP514"><a href="#JEP514" class="headerlink" title="JEP514"></a>JEP514</h2><p><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></p>
-<p>作用是把开始训练/生成训练数据的两个命令行合并成一个命令（在应用结束的时候起一个子进程运行生成训练数据的命令）</p>
-<p>目前存在一些问题，生成训练数据时候的启动参数是和启动应用时一样的。但在应用容器这样的启动方式时，可能存在像-Dcom.sun.management.jmxremote.port=1099这样的启动参数，会因端口冲突导致生成训练数据的步骤失败。</p>
-<h1 id="目前最大的问题"><a href="#目前最大的问题" class="headerlink" title="目前最大的问题"></a>目前最大的问题</h1><h2 id="只支持java内置的classloader"><a href="#只支持java内置的classloader" class="headerlink" title="只支持java内置的classloader"></a>只支持java内置的classloader</h2><p>BootClassLoader</p>
-<p><a href="https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/lang/ClassLoader.html#getPlatformClassLoader()">PlatformClassLoader</a></p>
-<p><a href="https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/lang/ClassLoader.html#getSystemClassLoader()">AppClassLoader</a></p>
-<p>可能会在未来放开这一限制</p>
-<p>Spring所做的jar包展开本质上也是更换了classLoader（非nestedJar的情况下不再需要使用自定义的classLoader）</p>
-<h2 id="不支持ZGC"><a href="#不支持ZGC" class="headerlink" title="不支持ZGC"></a>不支持ZGC</h2><p>未来会支持</p>
-<h1 id="Leyden和Native-Image的区别"><a href="#Leyden和Native-Image的区别" class="headerlink" title="Leyden和Native Image的区别"></a>Leyden和Native Image的区别</h1><p>Leyden相比Native Image而言，不会砍掉JVM的动态性。对开发而言可以做到基本无感。</p>
-<p><strong>以下是一些详细说明：</strong></p>
-<p>Leyden项目不打算直接合并GraalVM的工作，而是参考一部分Graal思路的同时，在项目开始时保留一部分运行时特征</p>
-<p><a href="https://www.infoq.com/news/2022/06/project-leyden-delays-aot/">https://www.infoq.com/news/2022/06/project-leyden-delays-aot/</a></p>
-<p>这种转向在Leyden项目的一部分问答中有所体现</p>
-<p><a href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></p>
-<p><a href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></p>
-<p>官方描述中也可以看出</p>
-<p><a href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></p>
-<p>其他</p>
-<p><a href="https://vived.io/how-committing-graalvm-to-openjdk-changes-the-rules-for-project-leyden-jvm-weekly-110/">https://vived.io/how-committing-graalvm-to-openjdk-changes-the-rules-for-project-leyden-jvm-weekly-110/</a></p>
-<h1 id="需要关注的工作"><a href="#需要关注的工作" class="headerlink" title="需要关注的工作"></a>需要关注的工作</h1><p>jar包展开</p>
-<p><a href="https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation">https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation</a></p>
-<p><a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></p>
-<p><a href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></p>
-]]></content>
-      <categories>
-        <category>Java</category>
-      </categories>
-      <tags>
-        <tag>Java</tag>
-        <tag>JVM</tag>
-        <tag>Leyden</tag>
-        <tag>AOT</tag>
       </tags>
   </entry>
   <entry>

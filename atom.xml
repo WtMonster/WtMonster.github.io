@@ -6,7 +6,7 @@
   <link href="https://wtmonster.github.io/atom.xml" rel="self"/>
   
   <link href="https://wtmonster.github.io/"/>
-  <updated>2025-12-19T16:00:00.000Z</updated>
+  <updated>2025-12-11T16:00:00.000Z</updated>
   <id>https://wtmonster.github.io/</id>
   
   <author>
@@ -15,34 +15,6 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
-  
-  <entry>
-    <title>JDK21升级时的一些意外收获</title>
-    <link href="https://wtmonster.github.io/2024/10/28/2024-10-28-jdk21-unexpected-findings/"/>
-    <id>https://wtmonster.github.io/2024/10/28/2024-10-28-jdk21-unexpected-findings/</id>
-    <published>2024-10-27T16:00:00.000Z</published>
-    <updated>2025-12-19T16:00:00.000Z</updated>
-    
-    <content type="html"><![CDATA[<h1 id="某个内部-agent"><a href="#某个内部-agent" class="headerlink" title="某个内部 agent"></a>某个内部 agent</h1><p>这个问题实际上与jdk21无关，是某个内部 agent自身存在的问题，哪个jdk版本都存在，只不过不通过分析工具无法看出来，升级时无意发现并解决了。</p><h2 id="发现问题"><a href="#发现问题" class="headerlink" title="发现问题"></a>发现问题</h2><p>在升级时使用JFR分析应用发现启动时大量异常：java.lang.NoClassDefFoundError，后续应用运行期间也陆陆续续有报错。或者说只要进行类加载就会报这个错。</p><span id="more"></span><p>但是这部分异常是会被吞掉的，也就是说我们 <strong>无法通过日志等方式看到这一部分开销，可能这也就是为什么它一直没有被发现</strong>。</p><p>具体报错代码在</p><p>从报错频率来看初步判断是由于Agent工具类初始化失败导致的，因为虚拟机只会进行一次类加载，如果加载失败了后续每次使用都会报错。</p><p>找到第一次初始化失败的调用堆栈，可以看到异常出现在Agent工具类的第45行</p><p>也就是说实际上是 <strong>日志门面类加载失败</strong>，导致了 <strong>Agent工具类的初始化失败</strong>。</p><p>那么为什么日志门面类会初始化失败呢？从报错堆栈来看实际上并没有进入到日志门面类的初始化逻辑中，因此基本可以确认是根本 <strong>找不到日志门面类这个类</strong></p><p>另外从调用栈中可以看出来，Agent工具类在前面已经被使用过了，但是在后面却重新初始化了，这只有一种可能性，那就是调用链路中 <strong>切换了类加载器</strong>。</p><p>我们使用Arthas查看类加载情况，主要关注三个类Agent工具类、Transformer类、日志门面类</p><p>sc -d org.slf4j.日志门面类</p><p>对比可以看出来，日志门面类没有被AppClassloader加载过。</p><p>我们可以通过入口类，也就是Transformer类来看。</p><p>由于某个内部 agent是通过动态Agent进行增强，因此我们找到Agent的入口类，也就是Agent入口类来看到逻辑</p><p>由于这是agent里面的代码，因此都是使用AppClassLoader进行的类加载，而在某个内部 agent的包里面是没有打包日志门面类的依赖的，那自然就找不到日志门面类这个类了。</p><p>那某个内部 agent为何可以正常运作呢？</p><p>查看代码发现在点火流程中也new了一个Transformer类，因为这是正常点火流程里面的，因此类自然是由应用容器的webAppClassLoader所管理的，因此可以正常加载到日志门面类等相关类</p><p>（上面的inst是通过反射拿到了agent内部回调的Instrumentation对象，因此相对于绕过了类加载器的影响）</p><p>所以这就导致Instrumentation中实际上存在两个Transformer类</p><p>一个是由AppClassLoader加载的无效的Transformer类，每次类加载都会经过这个Transformer类都会报错；</p><p>另一个是由应用容器加载的实际生效的Transformer类。</p><h2 id="解决问题"><a href="#解决问题" class="headerlink" title="解决问题"></a>解决问题</h2><p>将Agent入口类中的Transformer类删掉就好了。</p>]]></content>
-    
-    
-    <summary type="html">&lt;h1 id=&quot;某个内部-agent&quot;&gt;&lt;a href=&quot;#某个内部-agent&quot; class=&quot;headerlink&quot; title=&quot;某个内部 agent&quot;&gt;&lt;/a&gt;某个内部 agent&lt;/h1&gt;&lt;p&gt;这个问题实际上与jdk21无关，是某个内部 agent自身存在的问题，哪个jdk版本都存在，只不过不通过分析工具无法看出来，升级时无意发现并解决了。&lt;/p&gt;
-&lt;h2 id=&quot;发现问题&quot;&gt;&lt;a href=&quot;#发现问题&quot; class=&quot;headerlink&quot; title=&quot;发现问题&quot;&gt;&lt;/a&gt;发现问题&lt;/h2&gt;&lt;p&gt;在升级时使用JFR分析应用发现启动时大量异常：java.lang.NoClassDefFoundError，后续应用运行期间也陆陆续续有报错。或者说只要进行类加载就会报这个错。&lt;/p&gt;</summary>
-    
-    
-    
-    <category term="Java" scheme="https://wtmonster.github.io/categories/Java/"/>
-    
-    
-    <category term="Java" scheme="https://wtmonster.github.io/tags/Java/"/>
-    
-    <category term="JDK21" scheme="https://wtmonster.github.io/tags/JDK21/"/>
-    
-    <category term="JVM" scheme="https://wtmonster.github.io/tags/JVM/"/>
-    
-    <category term="JFR" scheme="https://wtmonster.github.io/tags/JFR/"/>
-    
-  </entry>
   
   <entry>
     <title>JDK25-Leyden</title>
