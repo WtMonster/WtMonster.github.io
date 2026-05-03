@@ -1,464 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>常量池详解</title>
-    <url>/2022/06/25/%E5%B8%B8%E9%87%8F%E6%B1%A0%E8%AF%A6%E8%A7%A3/</url>
-    <content><![CDATA[<h2 id="关于常量池"><a href="#关于常量池" class="headerlink" title="关于常量池"></a>关于常量池</h2><h3 id="常量池-Class常量池（Constant-pool）"><a href="#常量池-Class常量池（Constant-pool）" class="headerlink" title="常量池/Class常量池（Constant pool）"></a>常量池/Class常量池（Constant pool）</h3><p>常量池,也叫 Class 常量池(常量池 == Class常量池)。Java文件被编译成 Class文件，Class文件中除了包含类的版本、字段、方法、接口等描述信息外，还有一项就是常量池，常量池是当Class文件被Java虚拟机加载进来后存放在方法区 各种字面量 (Literal)和 符号引用 。</p>
-<span id="more"></span>
-
-<p><img src="image-20220825185951061.png" alt="image-20220825185951061"></p>
-<h3 id="运行时常量池（Runtime-constant-pool）"><a href="#运行时常量池（Runtime-constant-pool）" class="headerlink" title="运行时常量池（Runtime constant pool）"></a>运行时常量池（Runtime constant pool）</h3><p>运行时常量池是方法区的一部分。运行时常量池是当Class文件被加载到内存后，Java虚拟机会 **将Class文件常量池里的内容转移到运行时常量池里(运行时常量池也是每个类都有一个)**。运行时常量池相对于Class文件常量池的另外一个重要特征是具备动态性，Java语言并不要求常量一定只有编译期才能产生，也就是并非预置入Class文件中常量池的内容才能进入方法区运行时常量池，运行期间也可能将新的常量放入池中</p>
-<p><strong>只存放字符串引用</strong></p>
-<p><img src="watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQ1NzM3MDY4,size_16,color_FFFFFF,t_70-16547411527242-166140658303417.png" alt="watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQ1NzM3MDY4,size_16,color_FFFFFF,t_70-16547411527242"></p>
-<h3 id="字符串常量池（String-pool-String-table）"><a href="#字符串常量池（String-pool-String-table）" class="headerlink" title="字符串常量池（String pool/String table）"></a>字符串常量池（String pool/String table）</h3><p>字符串常量池逻辑上是运行时常量池的子集，具体可见<a href="https://github.com/fenixsoft/jvm_book/issues/112">https://github.com/fenixsoft/jvm_book/issues/112</a></p>
-<p>字符串常量池又称为：字符串池，全局字符串池,英文也叫String Pool。 在工作中，String类是我们使用频率非常高的一种对象类型。JVM为了提升性能和减少内存开销，避免字符串的重复创建，其维护了一块特殊的内存空间：字符串常量池。<strong>字符串常量池由String类私有的维护</strong>。</p>
-<h3 id="常量池和字符串常量池的版本变化"><a href="#常量池和字符串常量池的版本变化" class="headerlink" title="常量池和字符串常量池的版本变化"></a>常量池和字符串常量池的版本变化</h3><ul>
-<li><p>在JDK1.7之前运行时常量池逻辑包含字符串常量池存放在方法区, 此时hotspot虚拟机对方法区的实现为永久代</p>
-</li>
-<li><p>在JDK1.7 字符串常量池、静态变量等被从方法区拿到了堆中, 这里没有提到运行时常量池,也就是说 字符串常量池被单独拿到堆,运行时常量池剩下的东西还在方法区, 也就是hotspot中的永久代</p>
-<blockquote>
-<p>字符串常量池本身并没有被移动，还是在native memory，移动的是String实例，也就是逻辑上移动到了堆</p>
-</blockquote>
-</li>
-<li><p>在JDK1.8 hotspot移除了永久代用元空间(Metaspace)取而代之, 这时候字符串常量池还在堆, 运行时常量池还在方法区, 只不过方法区的实现从永久代变成了元空间(Metaspace)</p>
-<blockquote>
-<p>字符串常量池（StringTable）在native memory，一般逻辑上认为在堆里面</p>
-</blockquote>
-</li>
-<li><p>JDK1.8-1.9,String底层从char数组变成了byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
-</li>
-<li><p>补充：</p>
-<ul>
-<li>对象只能存在于堆中（虚拟机规范的定义），所以String实体只能存在于堆中</li>
-<li>运行时常量池存放的是字面量引用</li>
-<li>使用双引号方式显式声明的字符串，则直接放入字符串常量池中（final修饰的“变量”可以直接看作双引号字面量）</li>
-</ul>
-</li>
-</ul>
-<p><strong>StringTable为什么要调整</strong>（1.6-1.7）</p>
-<ul>
-<li>permSize默认比较小</li>
-<li>永久代垃圾回收频率低</li>
-</ul>
-<p><strong>字符串拼接操作</strong></p>
-<ul>
-<li>常量与常量的拼接结果在常量池，原理是编译器优化</li>
-<li>常量池中不会存在相同内容的常量</li>
-<li>只要其中一个是变量，结果就在堆中。变量拼接的原理是StringBuilder（final不算变量），返回String对象</li>
-<li>如果拼接的结果调用intern()方法，则注定将常量池中还没有的字符串对象放入池中，并返回此对象地址</li>
-</ul>
-<p><strong>所以建议多使用final定义字符串,并且不使用new，对于new String()声明final不会优化</strong></p>
-<p>示例</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="type">boolean</span> <span class="title function_">IsInPool</span><span class="params">(String str)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> str == str.intern();</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">a1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>;</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">a2</span> <span class="operator">=</span> <span class="string">&quot;b&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a3</span> <span class="operator">=</span> a1 + a2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">limit1</span> <span class="operator">=</span> <span class="string">&quot;ab&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="type">String</span> <span class="variable">a4</span> <span class="operator">=</span> <span class="string">&quot;c&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a5</span> <span class="operator">=</span> <span class="string">&quot;d&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a6</span> <span class="operator">=</span> a4 + a5;</span><br><span class="line">    <span class="type">String</span> <span class="variable">limit2</span> <span class="operator">=</span> <span class="string">&quot;cd&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="type">String</span> <span class="variable">b1</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;e&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">b2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;f&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">b3</span> <span class="operator">=</span> b1 + b2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">limit3</span> <span class="operator">=</span> <span class="string">&quot;ef&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">b4</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;g&quot;</span>);</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">b5</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;h&quot;</span>);</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">b6</span> <span class="operator">=</span> b4 + b5;</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">limit4</span> <span class="operator">=</span> <span class="string">&quot;gh&quot;</span>;</span><br><span class="line"></span><br><span class="line">    System.out.println(IsInPool(a3));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(a6));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(b3));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(b6));<span class="comment">//false</span></span><br></pre></td></tr></table></figure>
-
-<img src="image-20211008215003210.png" alt="image-20211008215003210" style="zoom:50%;">
-
-<h2 id="字符串的创建与常量池"><a href="#字符串的创建与常量池" class="headerlink" title="字符串的创建与常量池"></a><strong>字符串的创建与常量池</strong></h2><p><strong>String两种创建方式</strong></p>
-<ul>
-<li>方式一（str值和字符串常量池中字面量地址相等）</li>
-</ul>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> <span class="string">&quot;abc&quot;</span></span><br></pre></td></tr></table></figure>
-
-<ol>
-<li>检查字符串常量池是否存在该字符串，存在则不创建并且返回string对象的引用</li>
-<li>不存在则在堆中创建该字符串常量对应的string对象并将其引用存入字符串常量池中，然后返回该创建对象的引用</li>
-</ol>
-<ul>
-<li>方式二（str值和字符串常量池中字面量地址不相等）</li>
-</ul>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;abc&quot;</span>)</span><br></pre></td></tr></table></figure>
-
-<ol>
-<li><p>检查字符串常量池是否存在该字符串，存在则不创建string对象,不存在则在堆中创建该字符串常量对应的string对象并将其引用存入字符串常量池中</p>
-<blockquote>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// hotspot/src/share/vm/classfile/symbolTable.cpp</span></span><br><span class="line"><span class="comment">// try to reuse the string if possible</span></span><br><span class="line"><span class="keyword">if</span> (!string_or_null.is_null()) &#123;</span><br><span class="line"> <span class="built_in">string</span> = string_or_null;</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line"> <span class="built_in">string</span> = java_lang_String::create_from_unicode(name, len, CHECK_NULL);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</blockquote>
-</li>
-<li><p>在堆中创建该对象，对象内部的char数组（实际的value）与常量池中创建的string对象共用一个char数组</p>
-</li>
-</ol>
-<p><strong>测试代码</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str1</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;abcd&quot;</span>);</span><br><span class="line"><span class="type">String</span> <span class="variable">str2</span> <span class="operator">=</span> <span class="string">&quot;abcd&quot;</span>;</span><br><span class="line"><span class="type">Field</span> <span class="variable">value</span> <span class="operator">=</span> str1.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">value.setAccessible(<span class="literal">true</span>);</span><br><span class="line">System.out.println(System.identityHashCode(str1));<span class="comment">//990368553</span></span><br><span class="line">System.out.println(System.identityHashCode(value.get(str1)));<span class="comment">//1096979270</span></span><br><span class="line">System.out.println(System.identityHashCode(value.get(str2)));<span class="comment">//1096979270</span></span><br><span class="line">System.out.println(System.identityHashCode(str2));<span class="comment">//1078694789</span></span><br><span class="line">System.out.println(System.identityHashCode(str1.intern()));<span class="comment">//1078694789</span></span><br></pre></td></tr></table></figure>
-
-<p><strong>普遍地</strong></p>
-<p>使用双引号方式显式存在的字符串，则直接放入字符串常量池中（final修饰的“变量”可以直接看作双引号字面量）</p>
-<h3 id="一些测试（JDK1-8）"><a href="#一些测试（JDK1-8）" class="headerlink" title="一些测试（JDK1.8）"></a><strong>一些测试</strong>（JDK1.8）</h3><p>情况一：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;b&quot;</span>);</span><br><span class="line">        <span class="type">String</span> <span class="variable">a3</span> <span class="operator">=</span> <span class="string">&quot;c&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a4</span> <span class="operator">=</span> a1 + a2;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a5</span> <span class="operator">=</span> a1 + a3;</span><br><span class="line"><span class="comment">//        String at = &quot;a&quot;+&quot;c&quot;;</span></span><br><span class="line"><span class="comment">//        String at1 = &quot;a&quot;+&quot;b&quot;;</span></span><br><span class="line"></span><br><span class="line">        System.out.println(IsInPool(a1));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(<span class="string">&quot;b&quot;</span>));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(a2));<span class="comment">//false</span></span><br><span class="line">        System.out.println(IsInPool(a3));<span class="comment">//true</span></span><br><span class="line"></span><br><span class="line">        System.out.println(IsInPool(a4));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(<span class="string">&quot;ab&quot;</span>));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(a5));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(<span class="string">&quot;ac&quot;</span>));<span class="comment">//true</span></span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-
-<p>情况二：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;b&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">a3</span> <span class="operator">=</span> <span class="string">&quot;c&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a4</span> <span class="operator">=</span> a1 + a2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a5</span> <span class="operator">=</span> a1 + a3;</span><br><span class="line">    <span class="type">String</span> <span class="variable">at</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>+<span class="string">&quot;c&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">at1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>+<span class="string">&quot;b&quot;</span>;</span><br><span class="line"></span><br><span class="line">    System.out.println(IsInPool(a1));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(<span class="string">&quot;b&quot;</span>));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(a2));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(a3));<span class="comment">//true</span></span><br><span class="line"></span><br><span class="line">    System.out.println(IsInPool(a4));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(<span class="string">&quot;ab&quot;</span>));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(a5));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(<span class="string">&quot;ac&quot;</span>));<span class="comment">//t</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>IsInpool函数</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">   <span class="comment">//使用这个函数需要在这个函数前使用双引号字面量使得字符串直接被加入常量池中</span></span><br><span class="line"><span class="comment">//使用顺序应为待测字符串-&gt;字面量-&gt;IsInPool</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="type">boolean</span> <span class="title function_">IsInPool</span><span class="params">(String str)</span>&#123;</span><br><span class="line">       <span class="keyword">return</span> str == str.intern();</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="对于intern函数的理解"><a href="#对于intern函数的理解" class="headerlink" title="对于intern函数的理解"></a>对于intern函数的理解</h3><p>调用这个方法之后就是去看当前字符串是否在字符串常量池中已经存在引用</p>
-<p>（1）<strong>存 在</strong>：那就直接返回该字符串在字符串常量池中所对应的地址给栈中要引用这个字符串的变量。</p>
-<p>（2）<strong>不存在</strong>：<br>① jdk 1.6：先在字符串常量池中创建该字符串，地址与堆中字符串地址不相同（方法区）。然后再返回刚创建的字符串在字符串常量池中所对应的地址给栈中要引用这个字符串的变量。</p>
-<p>② jdk 1.7及以后：直接将堆中（不是字符串常量池中）该字符串的地址复制到字符串常量池中，这样字符串常量池就有了该字符串的地址引用，也可以说此时字符串常量池中的字符串只是一个对堆中字符串对象的引用，它们两个的地址相同，然后再把这个地址返回给栈中要引用这个字符串的变量。</p>
-<blockquote>
-<p>具体看下面源码解析，这里描述可能不太精确</p>
-</blockquote>
-<h3 id="对测试的解释"><a href="#对测试的解释" class="headerlink" title="对测试的解释"></a>对测试的解释</h3><ul>
-<li>第一次两个拼接测试为true，因为intern函数将堆中字符串对象引用复制到字符串常量池中，所以二者自然相等</li>
-<li>第二次两个拼接测试为false，因为intern检查到已经存在该字符常量，且堆常量池中保存的是字符串的值，二者自然不相等</li>
-</ul>
-<h3 id="对StringBuilder的优化"><a href="#对StringBuilder的优化" class="headerlink" title="对StringBuilder的优化"></a>对StringBuilder的优化</h3><p>对于StringBuilder.append,底层默认为长度为16的char型数组，超出长度则需要新建数组重新依次赋值</p>
-<p>如果明确知道长度不高于某个值，可以使用new StringBuilder(max)来初始化 </p>
-<h2 id="String的不可变性与强制修改"><a href="#String的不可变性与强制修改" class="headerlink" title="String的不可变性与强制修改"></a>String的不可变性与强制修改</h2><h3 id="String为什么不可变？"><a href="#String为什么不可变？" class="headerlink" title="String为什么不可变？"></a>String为什么不可变？</h3><ul>
-<li>因为String底层是private修饰的final类型的char数组</li>
-</ul>
-<blockquote>
-<p>Java9之后改用byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
-</blockquote>
-<ul>
-<li><p>value数组创建出来后本身长度不可变，final修饰后也不能修改为其他引用</p>
-</li>
-<li><p>并且String本身是final类，也就是不可被继承的</p>
-</li>
-</ul>
-<p><strong>以上都是不考虑反射的说法</strong></p>
-<h3 id="强制修改String"><a href="#强制修改String" class="headerlink" title="强制修改String"></a>强制修改String</h3><p><strong>通过反射可以修改String</strong></p>
-<p><strong>两块测试代码块应独立测试，因为第一部分代码块的isInPool会对常量池造成影响</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="type">boolean</span> <span class="title function_">isInPool</span><span class="params">(String str)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> str == str.intern();</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">    <span class="type">String</span> <span class="variable">s1</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;String  of &quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;test&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s</span> <span class="operator">=</span> s1 + s2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">origin</span> <span class="operator">=</span> <span class="string">&quot;String  of test&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">//用于检测常量池字面量是否被修改</span></span><br><span class="line">    <span class="comment">//如果被修改，那么intern返回的应该是常量池中地址，跟对象地址应该不一样</span></span><br><span class="line">    <span class="type">String</span> <span class="variable">s3</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;Reflect of &quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s4</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;test&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s5</span> <span class="operator">=</span> s3 + s4;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Influential---修改常量池中对象</span></span><br><span class="line"><span class="comment">     * 如果修改了，那么等下检测时str == str.intern()肯定会是true，</span></span><br><span class="line"><span class="comment">     * 因为常量池中不存在修改后的字面量，所以intern返回的是对象本身</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    System.out.println(<span class="string">&quot;修改堆对象&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前地址:&quot;</span>+System.identityHashCode(s));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前值:&quot;</span>+s);</span><br><span class="line">    <span class="type">Field</span> <span class="variable">value</span> <span class="operator">=</span> s.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">    value.setAccessible(<span class="literal">true</span>);</span><br><span class="line">    <span class="type">char</span>[] o = (<span class="type">char</span>[]) value.get(s);</span><br><span class="line">    System.out.println(<span class="string">&quot;反射数据地址:&quot;</span>+System.identityHashCode(o));</span><br><span class="line">    o[<span class="number">0</span>] = <span class="string">&#x27;R&#x27;</span>;</span><br><span class="line">    o[<span class="number">1</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o[<span class="number">2</span>] = <span class="string">&#x27;f&#x27;</span>;</span><br><span class="line">    o[<span class="number">3</span>] = <span class="string">&#x27;l&#x27;</span>;</span><br><span class="line">    o[<span class="number">4</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o[<span class="number">5</span>] = <span class="string">&#x27;c&#x27;</span>;</span><br><span class="line">    o[<span class="number">6</span>] = <span class="string">&#x27;t&#x27;</span>;</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后地址:&quot;</span>+System.identityHashCode(s));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后值:&quot;</span>+s);</span><br><span class="line">    System.out.println(isInPool(s));<span class="comment">//true</span></span><br><span class="line">    System.out.println(<span class="string">&quot;地址:&quot;</span>+System.identityHashCode(s));</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Influential---修改String对象</span></span><br><span class="line"><span class="comment">     * 如果修改了常量池中String字面量，那么等下检测时str == str.intern()应该要是false，</span></span><br><span class="line"><span class="comment">     * 因为常量池按理已经存在了修改后的字面量，所以intern返回的常量池中地址</span></span><br><span class="line"><span class="comment">     * 那么为什么会是true？</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    System.out.println(<span class="string">&quot;===============分割线===============&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;下面是修改常量池&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前地址:&quot;</span>+System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前值:&quot;</span>+origin);</span><br><span class="line">    <span class="type">Field</span> <span class="variable">value2</span> <span class="operator">=</span> origin.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">    value2.setAccessible(<span class="literal">true</span>);</span><br><span class="line">    <span class="type">char</span>[] o2 = (<span class="type">char</span>[]) value2.get(origin);</span><br><span class="line">    System.out.println(<span class="string">&quot;反射数据地址:&quot;</span>+System.identityHashCode(o2));</span><br><span class="line">    o2[<span class="number">0</span>] = <span class="string">&#x27;R&#x27;</span>;</span><br><span class="line">    o2[<span class="number">1</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">2</span>] = <span class="string">&#x27;f&#x27;</span>;</span><br><span class="line">    o2[<span class="number">3</span>] = <span class="string">&#x27;l&#x27;</span>;</span><br><span class="line">    o2[<span class="number">4</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">5</span>] = <span class="string">&#x27;c&#x27;</span>;</span><br><span class="line">    o2[<span class="number">6</span>] = <span class="string">&#x27;t&#x27;</span>;</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后地址:&quot;</span>+System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后值:&quot;</span>+origin);</span><br><span class="line"></span><br><span class="line">    System.out.println(isInPool(s5));<span class="comment">//true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>对于上面第二部分代码的解释</strong></p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">    <span class="type">String</span> <span class="variable">origin</span> <span class="operator">=</span> <span class="string">&quot;String  of test&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">//用于检测常量池字面量是否被修改</span></span><br><span class="line">    <span class="comment">//如果被修改，那么intern返回的应该是常量池中地址，跟对象地址应该不一样</span></span><br><span class="line">    <span class="type">String</span> <span class="variable">s3</span> <span class="operator">=</span><span class="string">&quot;Reflect of test&quot;</span>;</span><br><span class="line">    System.out.println(System.identityHashCode(s3));<span class="comment">//true</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Influential---修改String对象</span></span><br><span class="line"><span class="comment">     * 如果修改了常量池中String字面量，那么等下检测时str == str.intern()应该要是false，</span></span><br><span class="line"><span class="comment">     * 因为常量池按理已经存在了修改后的字面量，所以intern返回的常量池中地址</span></span><br><span class="line"><span class="comment">     * 那么为什么会是true？</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    System.out.println(<span class="string">&quot;===============分割线===============&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;下面是修改常量池&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前地址:&quot;</span> + System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前值:&quot;</span> + origin);</span><br><span class="line">    <span class="type">Field</span> <span class="variable">value2</span> <span class="operator">=</span> origin.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">    value2.setAccessible(<span class="literal">true</span>);</span><br><span class="line">    <span class="type">char</span>[] o2 = (<span class="type">char</span>[]) value2.get(origin);</span><br><span class="line">    System.out.println(<span class="string">&quot;反射数据地址:&quot;</span> + System.identityHashCode(o2));</span><br><span class="line">    o2[<span class="number">0</span>] = <span class="string">&#x27;R&#x27;</span>;</span><br><span class="line">    o2[<span class="number">1</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">2</span>] = <span class="string">&#x27;f&#x27;</span>;</span><br><span class="line">    o2[<span class="number">3</span>] = <span class="string">&#x27;l&#x27;</span>;</span><br><span class="line">    o2[<span class="number">4</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">5</span>] = <span class="string">&#x27;c&#x27;</span>;</span><br><span class="line">    o2[<span class="number">6</span>] = <span class="string">&#x27;t&#x27;</span>;</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后地址:&quot;</span> + System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后值:&quot;</span> + origin);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//此时S3&quot;Reflect of test&quot;</span></span><br><span class="line">    <span class="comment">//origin为&quot;Reflect of test&quot;</span></span><br><span class="line">    System.out.println(<span class="string">&quot;修改前常量池的string of reflect地址&quot;</span>+System.identityHashCode(s3));<span class="comment">//true</span></span><br><span class="line">    System.out.println(<span class="string">&quot;修改string of test产生的string of reflect地址&quot;</span>+System.identityHashCode(origin));<span class="comment">//true</span></span><br><span class="line">    String ss=<span class="string">&quot;Reflect of test&quot;</span>;</span><br><span class="line">    System.out.println(System.identityHashCode(ss));</span><br><span class="line"></span><br><span class="line">    String sss=<span class="string">&quot;String  of test&quot;</span>;</span><br><span class="line">    System.out.println(System.identityHashCode(sss));</span><br><span class="line">    System.out.println(origin);</span><br><span class="line">    System.out.println(sss);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这段代码会导致最后声明的sss输出结果变成Reflect of test</p>
-<p><img src="image-20220410235820491-166140589670210.png" alt="image-20220410235820491"></p>
-<p><strong>原因是：</strong></p>
-<p>字符串常量池底层其实是个hash表，这也很好地解释了字符串常量池检查重复的机制，查重能达到O(1)的复杂度。</p>
-<p>将一个字符串值存入常量池时，会在将hash值，字符串数组作为kv存入查重的hash表中。</p>
-<blockquote>
-<p>引用对象实体内容修改以后hash表里面字面量还是没变。</p>
-</blockquote>
-<p>上面这句话是错误的解释，常量的操作主要是三种</p>
-<ul>
-<li>一方面是编译时会优化</li>
-<li>一方面显示声明会自动加常量池</li>
-<li>一方面即时编译器也会优化</li>
-</ul>
-<p>实际上图中的问题是编译期间将多个常量只创建了一份，也就是通过的是class常量池，并非通过字符串常量池去重。</p>
-<p>不过通过字面量显示声明的常量创建还是会走常量池的（无论是第一次创建还是后续重复创建）。</p>
-<p>测试的时候可以通过将常量分别在多个类中编写来避免这种编译期间的去重（并且使用-Xint指定节解释执行）。</p>
-<p>SymbolTable底层是基于hashtable实现的，结构是数组+链表，当存储的数据足够多，遇到hash碰撞严重时（Hotspot触发rehash的条件是：查找一个字符串超过100次），是通过切换hash算法实现的。</p>
-<h2 id="intern源码研究-JDK8"><a href="#intern源码研究-JDK8" class="headerlink" title="intern源码研究(JDK8)"></a>intern源码研究(JDK8)</h2><p><a href="https://blog.csdn.net/qq_19648191/article/details/117358082">https://blog.csdn.net/qq_19648191/article/details/117358082</a></p>
-<p><a href="https://www.freesion.com/article/61901174982/">https://www.freesion.com/article/61901174982/</a></p>
-<p><a href="https://blog.csdn.net/qq_33678688/article/details/89091930">https://blog.csdn.net/qq_33678688/article/details/89091930</a></p>
-<p><a href="https://zhuanlan.zhihu.com/p/28973077">https://zhuanlan.zhihu.com/p/28973077</a></p>
-<ol>
-<li><p><code>hotspot/src/share/vm/prims/jvm.cpp</code></p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// String support ///////////////////////////////////////////////////////////////////////////</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">JVM_ENTRY</span>(jstring, <span class="built_in">JVM_InternString</span>(JNIEnv *env, jstring str))</span><br><span class="line">  <span class="built_in">JVMWrapper</span>(<span class="string">&quot;JVM_InternString&quot;</span>);</span><br><span class="line">  JvmtiVMObjectAllocEventCollector oam;</span><br><span class="line">  <span class="keyword">if</span> (str == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  oop string = JNIHandles::<span class="built_in">resolve_non_null</span>(str);</span><br><span class="line">  oop result = StringTable::<span class="built_in">intern</span>(string, CHECK_NULL);</span><br><span class="line">  <span class="keyword">return</span> (jstring) JNIHandles::<span class="built_in">make_local</span>(env, result);</span><br><span class="line">JVM_END</span><br></pre></td></tr></table></figure>
-</li>
-<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">oop <span class="title">StringTable::intern</span><span class="params">(oop string, TRAPS)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (string == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  <span class="function">ResourceMark <span class="title">rm</span><span class="params">(THREAD)</span></span>;</span><br><span class="line">  <span class="type">int</span> length;</span><br><span class="line">  <span class="comment">// 创建string的句柄</span></span><br><span class="line">  <span class="function">Handle <span class="title">h_string</span> <span class="params">(THREAD, string)</span></span>;</span><br><span class="line">  <span class="comment">// 转换成Unicode编码的玩意，这里似乎是重新开空间创建一个Unicode的字符串</span></span><br><span class="line">  <span class="comment">// 但是在后面这个Unicode字符串只用于计算哈希值和查找比对，除非下一个intern方法中发现句柄没有创建才会用到这个Unicode来创建句柄</span></span><br><span class="line">  jchar* chars = java_lang_String::<span class="built_in">as_unicode_string</span>(string, length,</span><br><span class="line">                                                     CHECK_NULL);</span><br><span class="line">  <span class="comment">// 调用最终的intern</span></span><br><span class="line">  oop result = <span class="built_in">intern</span>(h_string, chars, length, CHECK_NULL);</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
-<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// string是个handle，chars是转成了unicode的原字符串</span></span><br><span class="line"><span class="function">oop <span class="title">StringTable::intern</span><span class="params">(Handle string_or_null, jchar* name,</span></span></span><br><span class="line"><span class="params"><span class="function">                        <span class="type">int</span> len, TRAPS)</span> </span>&#123; y</span><br><span class="line">  <span class="type">unsigned</span> <span class="type">int</span> hashValue = <span class="built_in">hash_string</span>(name, len);</span><br><span class="line">  <span class="type">int</span> index = <span class="built_in">the_table</span>()-&gt;<span class="built_in">hash_to_index</span>(hashValue);</span><br><span class="line">  oop found_string = <span class="built_in">the_table</span>()-&gt;<span class="built_in">lookup</span>(index, name, len, hashValue);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Found</span></span><br><span class="line">  <span class="keyword">if</span> (found_string != <span class="literal">NULL</span>) <span class="keyword">return</span> found_string;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">debug_only</span>(StableMemoryChecker <span class="built_in">smc</span>(name, len * <span class="built_in">sizeof</span>(name[<span class="number">0</span>])));</span><br><span class="line">  <span class="built_in">assert</span>(!Universe::<span class="built_in">heap</span>()-&gt;<span class="built_in">is_in_reserved</span>(name),</span><br><span class="line">         <span class="string">&quot;proposed name of symbol must be stable&quot;</span>);</span><br><span class="line"></span><br><span class="line">  Handle string;</span><br><span class="line">  <span class="comment">// try to reuse the string if possible</span></span><br><span class="line">  <span class="comment">// 如果这个句柄已经创建好了能直接用那就直接用</span></span><br><span class="line">  <span class="keyword">if</span> (!string_or_null.<span class="built_in">is_null</span>()) &#123;</span><br><span class="line">    string = string_or_null;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// 如果句柄没有创建好那就从转为Unicode编码后的这个字符串创建一个句柄</span></span><br><span class="line">    <span class="comment">// 目前看来似乎是编译期间使用双引号创建字面量会走这个逻辑，字符串常量池会直接创建一个string</span></span><br><span class="line">    string = java_lang_String::<span class="built_in">create_from_unicode</span>(name, len, CHECK_NULL);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Grab the StringTable_lock before getting the_table() because it could</span></span><br><span class="line">  <span class="comment">// change at safepoint.</span></span><br><span class="line">  <span class="function">MutexLocker <span class="title">ml</span><span class="params">(StringTable_lock, THREAD)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Otherwise, add to symbol to table</span></span><br><span class="line">  <span class="comment">// 向stringtable里面添加句柄</span></span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">the_table</span>()-&gt;<span class="built_in">basic_add</span>(index, string, name, len,</span><br><span class="line">                                hashValue, CHECK_NULL);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
-<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function">oop <span class="title">StringTable::basic_add</span><span class="params">(<span class="type">int</span> index_arg, Handle string, jchar* name,</span></span></span><br><span class="line"><span class="params"><span class="function">                           <span class="type">int</span> len, <span class="type">unsigned</span> <span class="type">int</span> hashValue_arg, TRAPS)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">assert</span>(java_lang_String::<span class="built_in">equals</span>(<span class="built_in">string</span>(), name, len),</span><br><span class="line">         <span class="string">&quot;string must be properly initialized&quot;</span>);</span><br><span class="line">  <span class="comment">// Cannot hit a safepoint in this function because the &quot;this&quot; pointer can move.</span></span><br><span class="line">  No_Safepoint_Verifier nsv;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Check if the symbol table has been rehashed, if so, need to recalculate</span></span><br><span class="line">  <span class="comment">// the hash value and index before second lookup.</span></span><br><span class="line">  <span class="type">unsigned</span> <span class="type">int</span> hashValue;</span><br><span class="line">  <span class="type">int</span> index;</span><br><span class="line">  <span class="keyword">if</span> (<span class="built_in">use_alternate_hashcode</span>()) &#123;</span><br><span class="line">    hashValue = <span class="built_in">hash_string</span>(name, len);</span><br><span class="line">    index = <span class="built_in">hash_to_index</span>(hashValue);</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    hashValue = hashValue_arg;</span><br><span class="line">    index = index_arg;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Since look-up was done lock-free, we need to check if another</span></span><br><span class="line">  <span class="comment">// thread beat us in the race to insert the symbol.</span></span><br><span class="line">  <span class="comment">// 如果已经有了就不用添加了并且可以直接返回</span></span><br><span class="line">  oop test = <span class="built_in">lookup</span>(index, name, len, hashValue); <span class="comment">// calls lookup(u1*, int)</span></span><br><span class="line">  <span class="keyword">if</span> (test != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="comment">// Entry already added</span></span><br><span class="line">    <span class="keyword">return</span> test;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// HashtableEntry 里面保存hash值以及这个字符串的引用（_literal），有了引用就可以得到字符串的字面量和地址了</span></span><br><span class="line">  HashtableEntry&lt;oop, mtSymbol&gt;* entry = <span class="built_in">new_entry</span>(hashValue, <span class="built_in">string</span>());</span><br><span class="line">  <span class="built_in">add_entry</span>(index, entry);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">string</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
-</ol>
-<h2 id="补充"><a href="#补充" class="headerlink" title="补充"></a><strong>补充</strong></h2><p><strong>关于内存分配位置</strong></p>
-<ol>
-<li><p><code>hotspot/src/share/vm/runtime/handles.inline.hpp</code></p>
-<p>句柄的创建用的是线程本地内存，也就是堆空间</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">inline</span> <span class="title function_">Handle::Handle</span><span class="params">(Thread* thread, oop obj)</span> &#123;</span><br><span class="line">  assert(thread == Thread::current(), <span class="string">&quot;sanity check&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> (obj == <span class="literal">NULL</span>) &#123;</span><br><span class="line">    _handle = <span class="literal">NULL</span>;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    _handle = thread-&gt;handle_area()-&gt;allocate_handle(obj);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
-<p>Unicode字符串的创建也是用的堆空间</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">jchar* <span class="title function_">java_lang_String::as_unicode_string</span><span class="params">(oop java_string, <span class="type">int</span>&amp; length, TRAPS)</span> &#123;</span><br><span class="line">  typeArrayOop value  = java_lang_String::value(java_string);</span><br><span class="line">  <span class="type">int</span>          offset = java_lang_String::offset(java_string);</span><br><span class="line">               length = java_lang_String::length(java_string);</span><br><span class="line"></span><br><span class="line">  jchar* result = NEW_RESOURCE_ARRAY_RETURN_NULL(jchar, length);</span><br><span class="line">  <span class="keyword">if</span> (result != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> index = <span class="number">0</span>; index &lt; length; index++) &#123;</span><br><span class="line">      result[index] = value-&gt;char_at(index + offset);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    THROW_MSG_0(vmSymbols::java_lang_OutOfMemoryError(), <span class="string">&quot;could not allocate Unicode string&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// hotspot/src/share/vm/memory/allocation.hpp</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> NEW_RESOURCE_ARRAY_RETURN_NULL(type, size)\</span></span><br><span class="line"><span class="meta">  (type*) resource_allocate_bytes((size) * sizeof(type), AllocFailStrategy::RETURN_NULL)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// hotspot/src/share/vm/memory/resourceArea.cpp</span></span><br><span class="line"><span class="comment">// Allocation in thread-local resource area</span></span><br><span class="line"><span class="keyword">extern</span> <span class="type">char</span>* <span class="title function_">resource_allocate_bytes</span><span class="params">(<span class="type">size_t</span> size, AllocFailType alloc_failmode)</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> Thread::current()-&gt;resource_area()-&gt;allocate_bytes(size, alloc_failmode);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>StringTable的创建实际上是在nativememory</p>
-<ol>
-<li><p><a href="https://docs.oracle.com/javase/8/docs/technotes/guides/vm/enhancements-7.html">https://docs.oracle.com/javase/8/docs/technotes/guides/vm/enhancements-7.html</a></p>
-<p>官方文档说明说的是将interned strings移到堆内存中，而非StringTable</p>
-<blockquote>
-<p><strong>Area</strong>: HotSpot<br><strong>Standard/Platform</strong>: JDK 7<br><strong>Synopsis</strong>: In JDK 7, interned strings are no longer allocated in the permanent generation of the Java heap, but are instead allocated in the main part of the Java heap (known as the young and old generations), along with the other objects created by the application. This change will result in more data residing in the main Java heap, and lessw data in the permanent generation, and thus may require heap sizes to be adjusted. Most applications will see only relatively small differences in heap usage due to this change, but larger applications that load many classes or make heavy use of the <code>String.intern()</code> method will see more significant differences.<br><strong>RFE</strong>: <a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6962931">6962931</a></p>
-</blockquote>
-</li>
-<li><p>深入理解Java虚拟机中<code>3.2.2 可达性分析算法</code>写到</p>
-<blockquote>
-<p>在Java技术体系里面，固定可作为GC Roots的对象包括以下几种： </p>
-<p>·在虚拟机栈（栈帧中的本地变量表）中引用的对象，譬如各个线程被调用的方法堆栈中使用到的 参数、局部变量、临时变量等。 </p>
-<p>·在方法区中类静态属性引用的对象，譬如Java类的引用类型静态变量。 </p>
-<p>·<strong>在方法区中常量引用的对象，譬如字符串常量池（String Table）里的引用</strong></p>
-</blockquote>
-</li>
-<li><p>R大说的</p>
-<blockquote>
-<p>常量池”如果说的是SymbolTable / StringTable，这俩table自身原本就一直在native memory里，是它们所引用的东西在哪里更有意思。上面说了，java7是把SymbolTable引用的Symbol移动到了native memory，而StringTable引用的java.lang.String实例则从PermGen移动到了普通Java heap。</p>
-</blockquote>
-</li>
-<li><p>StringTable的创建源码</p>
-<p>hotspot/src/share/vm/memory/universe.cpp</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">jint <span class="title function_">universe_init</span><span class="params">()</span> &#123;</span><br><span class="line">	</span><br><span class="line">  ......</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (UseSharedSpaces) &#123;</span><br><span class="line">    <span class="comment">// Read the data structures supporting the shared spaces (shared</span></span><br><span class="line">    <span class="comment">// system dictionary, symbol table, etc.).  After that, access to</span></span><br><span class="line">    <span class="comment">// the file (other than the mapped regions) is no longer needed, and</span></span><br><span class="line">    <span class="comment">// the file is closed. Closing the file does not affect the</span></span><br><span class="line">    <span class="comment">// currently mapped regions.</span></span><br><span class="line">    MetaspaceShared::initialize_shared_spaces();</span><br><span class="line">    StringTable::create_table();</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    SymbolTable::create_table();</span><br><span class="line">    StringTable::create_table();</span><br><span class="line">    ClassLoader::create_package_info_table();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>调用链（jdk12）</p>
-<p><img src="image-20220720175742728-16614058967029.png" alt="image-20220720175742728"></p>
-<p>最终创建一个CHeap对象，不在 Java 的几个托管内存里，其实也就是native memory</p>
-</li>
-</ol>
-</li>
-</ol>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>总的来说，字符串常量池一直在nativememory中</p>
-<p>而JDK1.7之后interned strings被移动到了堆内存中，而StringTable保存的是字符串的hashvalue以及字符串本身</p>
-<p>另外，SymbolTable也在native memory中，至于SymbolTable的作用见<a href="https://hllvm-group.iteye.com/group/topic/26412#post-187861">https://hllvm-group.iteye.com/group/topic/26412#post-187861</a></p>
-<blockquote>
-<p>这些Utf8常量在HotSpot VM里以symbolOopDesc对象（下面简称symbol对象）来表现；它们可以通过一个全局的SymbolTable对象找到。注意：constantPool对象并不“包含”这些symbol对象，而只是引用着它们而已；或者说，constantPool对象只存了对symbol对象的引用，而没有存它们的内容。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/29352626/answer/44050736">https://www.zhihu.com/question/29352626/answer/44050736</a></p>
-<blockquote>
-<p>Symbol内嵌的存储不是char数组。如果要CONSTANT_String（String）引用了CONSTANT_Utf8（Symbol），那么ldc在初始化这个String对象的时候会从Symbol那边读取内容并创建对应的char[]以及String对象。</p>
-</blockquote>
-<blockquote>
-<p>Symbols在JDK7和JDK8里都在native memory里，但不在Metaspace里。<br>Symbols在native memory里通过引用计数管理，同时有个全局的SymbolTable管理着所有Symbol。</p>
-</blockquote>
-]]></content>
-      <categories>
-        <category>JVM</category>
-      </categories>
-      <tags>
-        <tag>JVM</tag>
-        <tag>常量池</tag>
-        <tag>HotSpot</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>一个关于二级索引的优化思路</title>
-    <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
-    <content><![CDATA[<p>一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）</p>
-<span id="more"></span>
-
-<h2 id="开端"><a href="#开端" class="headerlink" title="开端"></a>开端</h2><blockquote>
-<p>以下讨论范围是以B+树为数据结构的索引</p>
-<p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
-</blockquote>
-<p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p>
-<p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p>
-<p><strong>接下来我们只考虑除主键列外的其他列</strong></p>
-<p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p>
-<p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p>
-<p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p>
-<p><strong>那么考虑下面这种情况</strong></p>
-<p>有一个表 t_bl 有以下字段 (id,a,b）</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure>
-
-<p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p>
-<p>那么有以下两种索引建立方案</p>
-<ol>
-<li><p><strong>建立 a 字段的索引</strong></p>
-<p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p>
-<p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p>
-</li>
-<li><p><strong>建立 a,b 字段的联合索引</strong></p>
-<p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p>
-<p><strong>缺点</strong>：使得二级索引中的每个非节点都增加了存储 b 字段的不必要的空间开销（因为b字段并不是检索依据）。</p>
-<blockquote>
-<p>9.16补充：这种非叶子节点上的索引数据空间的额外开销还会导致扇出的降低</p>
-</blockquote>
-</li>
-</ol>
-<p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
-<p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a><strong>思考</strong></h2><p>innodb B+树索引页面大小默认是16kb，索引单位越小扇出越大。</p>
-<p>一个三层，扇出为100的 B+ 树，按照页面为单位，第三层假设10000个页，那么第二层就是100个页，第一层为1个页。</p>
-<p><strong>因此实际上叶子节点才是索引结构的主要空间开销，导致这个优化的收益并不是很高。</strong></p>
-<h2 id="大佬提供的思路"><a href="#大佬提供的思路" class="headerlink" title="大佬提供的思路"></a>大佬提供的思路</h2><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
-<blockquote>
-<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
-</blockquote>
-<ol>
-<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
-<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li>
-<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li>
-</ol>
-<p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p>
-<p>目前<strong>Microsoft SQL Server</strong>已经实现了这个功能</p>
-<p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p>
-<p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p>
-<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-        <category>疑问</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-        <tag>索引</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>MVCC与覆盖索引</title>
-    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
-    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
-<span id="more"></span>
-
-<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
-<p>参考资料</p>
-<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
-<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
-<p>《Innodb存储引擎》</p>
-</blockquote>
-<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
-<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
-<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
-<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
-<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
-<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
-<p><strong>所以</strong></p>
-<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
-<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
-<p>所以覆盖索引不是总不需要回表的。</p>
-<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
-<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
-<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
-<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
-<p>个人认为这是一种效率与空间之间的权衡。</p>
-</li>
-</ul>
-]]></content>
-      <categories>
-        <category>MySQL</category>
-      </categories>
-      <tags>
-        <tag>MySQL</tag>
-        <tag>MVCC</tag>
-        <tag>索引</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>从 JDK21 看到 JDK25：Leyden、JFR Method Timing 与虚拟线程后续演进</title>
-    <url>/2026/05/05/05-jdk25-leyden-follow-up/</url>
-    <content><![CDATA[<p>这篇是 JDK21 升级之后继续关注的一些方向，主要包括虚拟线程后续演进、JFR、GC、对象头压缩，以及 Leyden。</p>
-<p>JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。</p>
-<h2 id="1-JDK21-之后比较重要的变化"><a href="#1-JDK21-之后比较重要的变化" class="headerlink" title="1. JDK21 之后比较重要的变化"></a>1. JDK21 之后比较重要的变化</h2><h3 id="Loom"><a href="#Loom" class="headerlink" title="Loom"></a>Loom</h3><table>
+    <title>JDK21 升级实践：从收益判断到落地路径</title>
+    <url>/2026/05/01/01-jdk21-upgrade-practice/</url>
+    <content><![CDATA[<p>当前升级 JDK 的动力实际上主要来自三项：ZGC、虚拟线程、衍生生态。</p>
+<p>这篇先不做 JDK21 新特性大全，只讨论“什么应用适合升级”“升级到底能拿到什么收益”“实际落地时先关注哪些风险”。特性细节和虚拟线程/JFR 会放到后面的文章单独展开。</p>
+<h2 id="1-总体分析"><a href="#1-总体分析" class="headerlink" title="1. 总体分析"></a>1. 总体分析</h2><h3 id="ZGC"><a href="#ZGC" class="headerlink" title="ZGC"></a>ZGC</h3><p>优点：ZGC 基本消除了 GC 带来的延迟，并且对大对象有更好的处理。</p>
+<p>不足：ZGC 吞吐量比不上 G1。即便分代 ZGC 的吞吐已经有了很大提升，但与 G1 依然有一定差距，所以不能只看 pause time。</p>
+<p>我的判断是：如果应用的主要问题是 GC 导致的长尾，ZGC 很值得测；如果应用本身更看重极限吞吐，或者 GC 本来就不是瓶颈，那升级收益未必明显。</p>
+<h3 id="虚拟线程"><a href="#虚拟线程" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>优点：适用于 IO 密集型应用。一方面可以提高系统性能，另一方面可以极大消除线程带来的内存压力。</p>
+<p>不足：JDK21 里的虚拟线程坑还比较多，尤其是 <code>synchronized</code> pinning、ThreadLocal 使用方式变化、依赖库兼容性等问题。可靠性要求很高的应用，不建议一上来就大规模启用。</p>
+<p>这里要强调一点：升级到 JDK21 和启用虚拟线程应该拆开。JDK21 可以先升，虚拟线程应该单独灰度。</p>
+<h3 id="衍生生态"><a href="#衍生生态" class="headerlink" title="衍生生态"></a>衍生生态</h3><p>许多 Java 生态框架都在逐步提高基线版本，低 JDK 版本的维护会越来越弱。如果想探索基于高版本 JDK 的框架和工具链，升级 JDK 基本是绕不开的。</p>
+<p>这类收益不一定马上体现在接口耗时上，但会体现在后续框架升级、依赖治理、工具链维护成本上。</p>
+<h2 id="2-什么应用适合升级-JDK"><a href="#2-什么应用适合升级-JDK" class="headerlink" title="2. 什么应用适合升级 JDK"></a>2. 什么应用适合升级 JDK</h2><table>
 <thead>
 <tr>
-<th>Release</th>
-<th>JEP</th>
-<th>我的理解</th>
+<th>目标</th>
+<th>适用应用</th>
+<th>具体版本/策略</th>
+<th>风险</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>24</td>
-<td><a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a></td>
-<td>解决虚拟线程在 <code>synchronized</code> 上 pinning 的主要问题。JDK21 中虚拟线程最大的一类坑，后续版本已经在底层处理。</td>
+<td>ZGC</td>
+<td>GC 延迟敏感的应用，例如缓存应用；本地有大缓存、频繁生成大对象的应用</td>
+<td>如果对吞吐追求不高，可以考虑 JDK17 以上；如果对吞吐有更高要求，优先验证 JDK21 分代 ZGC</td>
+<td>分代 ZGC 需要充分压测，不要只看暂停时间</td>
 </tr>
 <tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a></td>
-<td>Scoped Values 正式交付。它提供基于显式作用域的值传递方式，适合替代一部分 ThreadLocal 上下文传递场景。</td>
+<td>虚拟线程</td>
+<td>IO 密集型应用，文件 IO 场景需要单独验证</td>
+<td>JDK21 可用，但建议独立开关、独立灰度</td>
+<td><code>synchronized</code> pinning 可能降低吞吐，严重时可能造成死锁</td>
+</tr>
+<tr>
+<td>衍生生态</td>
+<td>需要使用高版本框架、工具链或运行时能力的应用</td>
+<td>根据框架要求决定</td>
+<td>依赖兼容、构建插件、运行参数都要重新检查</td>
 </tr>
 </tbody></table>
-<p>JDK21 里虚拟线程已经正式可用，但如果从生产大规模使用的角度看，我认为 JDK24 的 JEP 491 非常关键。</p>
-<h3 id="JVM-相关"><a href="#JVM-相关" class="headerlink" title="JVM 相关"></a>JVM 相关</h3><table>
-<thead>
-<tr>
-<th>Release</th>
-<th>JEP</th>
-<th>我的理解</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
-<td>Lilliput 项目的阶段性成果，把对象头压缩到更小。对象很多的应用可能会有内存收益，具体效果要看应用对象分布。</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
-<td>Shenandoah 也进入分代方向。低延迟 GC 后面基本都在利用分代假说继续优化。</td>
-</tr>
-<tr>
-<td>25</td>
-<td><a href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
-<td>JFR 支持更细的方法级耗时 tracing。这个对线上分析很有吸引力，但生产开启范围和开销要认真控制。</td>
-</tr>
-<tr>
-<td>23 / 24</td>
-<td><a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> / <a href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
-<td>ZGC 后续只有分代模式。JDK21 先引入分代 ZGC，后面继续默认化、移除非分代模式。</td>
-</tr>
-</tbody></table>
-<p>这几个点说明一个趋势：JVM 还在持续降低延迟、降低内存占用、增强观测能力。JDK21 不是终点，只是一个比较适合落地的版本。</p>
-<h2 id="2-Leyden-相关进展"><a href="#2-Leyden-相关进展" class="headerlink" title="2. Leyden 相关进展"></a>2. Leyden 相关进展</h2><h3 id="已交付"><a href="#已交付" class="headerlink" title="已交付"></a>已交付</h3><ul>
-<li><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></li>
-<li><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></li>
-<li><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></li>
-<li><a href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></li>
-</ul>
-<p>这里和我最初整理时有一个变化：JEP 516 已经是 JDK26 delivered，不再是 doing 状态。所以如果只讨论 JDK25，需要把它放到“后续继续关注”的位置；如果讨论 Leyden 路线，就可以一起看。</p>
-<h3 id="继续关注"><a href="#继续关注" class="headerlink" title="继续关注"></a>继续关注</h3><ul>
-<li>AOT Code Compilation 相关草案。</li>
-<li>对更多 class loader 场景的支持。</li>
-<li>和 Spring Boot 打包、jar 展开、CDS 的工程化结合。</li>
-<li>启动参数、训练流程和正式启动流程的隔离。</li>
-</ul>
-<h2 id="3-核心-JEP-解读"><a href="#3-核心-JEP-解读" class="headerlink" title="3. 核心 JEP 解读"></a>3. 核心 JEP 解读</h2><h3 id="JEP-483：Ahead-of-Time-Class-Loading-amp-Linking"><a href="#JEP-483：Ahead-of-Time-Class-Loading-amp-Linking" class="headerlink" title="JEP 483：Ahead-of-Time Class Loading &amp; Linking"></a>JEP 483：Ahead-of-Time Class Loading &amp; Linking</h3><p>JEP 483 的核心是存储类加载和链接的训练数据。它关注的是应用启动时反复做的类加载、解析、链接工作，能不能提前做一部分。</p>
-<p>需要注意的是，它不是把 Java 变成 native 可执行文件，也不是直接消除 JVM 的动态性。它更像是让 JVM 在启动时少做一部分重复工作。</p>
-<p>我的理解：</p>
+<p>这张表其实是我对升级优先级的判断：先找收益目标，再决定升级策略。不要为了“统一版本”就把所有能力一起打开。</p>
+<h2 id="3-实际收益"><a href="#3-实际收益" class="headerlink" title="3. 实际收益"></a>3. 实际收益</h2><h3 id="分代-ZGC"><a href="#分代-ZGC" class="headerlink" title="分代 ZGC"></a>分代 ZGC</h3><p>一个比较典型的场景是缓存型服务。服务本地保留了较多数据，接口响应时间本身不慢，但尾延迟容易被 GC pause 拉高。</p>
+<p>这类服务升级到 JDK21 并使用分代 ZGC 后，比较明显的收益是长尾响应耗时收敛。在没有观察到资源占用异常提高的前提下，GC 带来的尾延迟问题得到了缓解。</p>
+<p>这里有几个观察点：</p>
 <ul>
-<li>对启动速度和预热速度有帮助。</li>
-<li>对 lambda、框架启动、类加载较多的应用可能更明显。</li>
-<li>class loader 越复杂，落地越需要验证。</li>
+<li>不要只看平均耗时，要看 P95/P99。</li>
+<li>不要只看 GC pause，要同时看 CPU、RSS、吞吐。</li>
+<li>同口径对比很重要，最好是同一类实例、同一类流量、同一段时间窗口。</li>
 </ul>
-<h3 id="JEP-515：Ahead-of-Time-Method-Profiling"><a href="#JEP-515：Ahead-of-Time-Method-Profiling" class="headerlink" title="JEP 515：Ahead-of-Time Method Profiling"></a>JEP 515：Ahead-of-Time Method Profiling</h3><p>JEP 515 存储方法调用 profile，例如方法执行次数、调用路径等，让 JIT 在应用启动时就能知道一些历史执行情况。</p>
-<p>这个点很有意思。理想情况下，热点路径在首次触达时就可以更快进入较好的编译优化状态。</p>
-<p>但这里也有一个需要注意的地方：如果 JIT 更早知道热点路径，启动初期可能会更积极地做优化，CPU 资源消耗也可能更集中。所以即便有 AOT Method Profiling，流量接入也不一定能完全取消慢启动，只是慢启动可以更快、更可控。</p>
-<p>未来如果 AOT Code Compilation 继续推进，上面这个问题可能会继续改善。</p>
-<h3 id="JEP-514：Ahead-of-Time-Command-Line-Ergonomics"><a href="#JEP-514：Ahead-of-Time-Command-Line-Ergonomics" class="headerlink" title="JEP 514：Ahead-of-Time Command-Line Ergonomics"></a>JEP 514：Ahead-of-Time Command-Line Ergonomics</h3><p>JEP 514 主要是改善命令行体验，把训练/生成配置的流程包装得更顺一点。</p>
-<p>这个 JEP 本身不算最核心的性能能力，但对工程化很重要。AOT 相关能力如果使用成本太高，就很难真正进入普通服务发布流程。</p>
-<p>一个实际需要注意的问题是：训练阶段和正式启动阶段不要简单复用所有启动参数。比如管理端口、监控端口、临时目录、文件路径，都可能在训练生成阶段产生冲突。工程化时最好把“训练配置”和“正式运行配置”拆开。</p>
-<h3 id="JEP-516：Ahead-of-Time-Object-Caching-with-Any-GC"><a href="#JEP-516：Ahead-of-Time-Object-Caching-with-Any-GC" class="headerlink" title="JEP 516：Ahead-of-Time Object Caching with Any GC"></a>JEP 516：Ahead-of-Time Object Caching with Any GC</h3><p>JEP 516 是 JDK26 的内容，不属于 JDK25，但它很能说明 Leyden 的方向：不只是类加载和链接，后续还会把一些对象状态提前缓存。</p>
-<p>这个方向如果成熟，对启动和预热会有更大帮助。但具体能缓存什么、和应用框架如何结合、如何保证正确性，都需要继续观察。</p>
-<h2 id="4-目前比较大的问题"><a href="#4-目前比较大的问题" class="headerlink" title="4. 目前比较大的问题"></a>4. 目前比较大的问题</h2><h3 id="class-loader"><a href="#class-loader" class="headerlink" title="class loader"></a>class loader</h3><p>Leyden 相关能力很容易受 class loader 影响。</p>
-<p>简单 classpath 应用是一回事，真实服务经常还有：</p>
+<p>分代 ZGC 的价值不是“所有服务都会变快”，而是它能解决一类非常明确的问题：GC pause 导致的长尾。</p>
+<h3 id="虚拟线程-1"><a href="#虚拟线程-1" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>另一个试点场景是 IO 密集型接口服务。启用虚拟线程后，平台线程数从数千量级降到了数百量级，部分接口 P95 有十几个百分点的改善。</p>
+<p>这个结果和预期是吻合的：虚拟线程降低的是阻塞式并发模型下的平台线程成本。大量时间花在远程调用、数据库访问、缓存访问上的服务，更容易看到收益。</p>
+<p>但这里不能只看收益。虚拟线程上线前必须看这些东西：</p>
 <ul>
-<li>fat jar / nested jar。</li>
-<li>应用服务器 class loader。</li>
-<li>插件化 class loader。</li>
-<li>框架自定义 class loader。</li>
-<li>agent 或字节码增强。</li>
+<li>是否有大量 <code>synchronized</code> 块或方法。</li>
+<li><code>synchronized</code> 里是否有 IO、sleep、park 或锁竞争。</li>
+<li>ThreadLocal 是否持有大对象或资源对象。</li>
+<li>HTTP client、数据库驱动、RPC 框架是否验证过虚拟线程兼容性。</li>
+<li>是否能通过 JFR 看到 <code>jdk.VirtualThreadPinned</code>。</li>
 </ul>
-<p>所以不要只看简单 demo 的效果。真实服务要看自己的打包方式和类加载路径。</p>
-<p>Spring Boot 这类框架已经在 jar 展开、CDS、AOT 方向做了一些工作，普通服务优先看框架集成会更稳。</p>
-<p>相关资料：</p>
+<p>我的建议是：虚拟线程不要和 JDK21 升级同时作为一个变量上线。先证明应用在 JDK21 下稳定，再开启虚拟线程灰度。</p>
+<h2 id="4-升级前准备"><a href="#4-升级前准备" class="headerlink" title="4. 升级前准备"></a>4. 升级前准备</h2><p>准备工作不复杂，但容易漏。</p>
+<h3 id="IDE-和本地环境"><a href="#IDE-和本地环境" class="headerlink" title="IDE 和本地环境"></a>IDE 和本地环境</h3><p>IDE 要能正确支持 JDK21 的语法、编译、调试和运行配置。这里不展开具体版本，直接看 IDE 官方对 JDK 版本的支持矩阵即可。</p>
+<h3 id="Maven-Gradle"><a href="#Maven-Gradle" class="headerlink" title="Maven/Gradle"></a>Maven/Gradle</h3><p>构建工具和插件要重点看：</p>
 <ul>
-<li><a href="https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation">https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation</a></li>
-<li><a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></li>
-<li><a href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></li>
+<li>compiler plugin 是否支持 JDK21。</li>
+<li>surefire/failsafe 是否能在 JDK21 下正常跑测试。</li>
+<li>依赖解析是否受 IDE 或 Maven 版本影响。</li>
+<li>CI 使用的 JDK 和本地是否一致。</li>
 </ul>
-<h3 id="GC-支持"><a href="#GC-支持" class="headerlink" title="GC 支持"></a>GC 支持</h3><p>早期 Leyden/AOT 能力和 GC 的配合有一些限制，后续 JEP 516 已经推进到 Any GC。这个方向需要继续跟。</p>
-<p>对业务应用来说，比较理想的状态是：不需要为了启动优化放弃原本选择的 GC。</p>
-<h3 id="训练流量"><a href="#训练流量" class="headerlink" title="训练流量"></a>训练流量</h3><p>AOT profile 类能力依赖训练数据。训练数据是否代表真实流量，会直接影响收益。</p>
-<p>如果训练流量和真实流量差异很大，可能只优化了启动路径，没优化真正的业务热点路径。对复杂服务来说，训练阶段如何设计是一个工程问题，不只是 JVM 参数问题。</p>
-<h2 id="5-Leyden-和-Native-Image-的区别"><a href="#5-Leyden-和-Native-Image-的区别" class="headerlink" title="5. Leyden 和 Native Image 的区别"></a>5. Leyden 和 Native Image 的区别</h2><p>Leyden 相比 Native Image，不会直接砍掉 JVM 的动态性。对普通 Java 应用来说，这一点很重要。</p>
-<p>Native Image 更像是基于 closed-world 假设，把应用提前编译成原生可执行文件。它启动快、内存占用低，但对反射、动态代理、运行时代码生成、类加载等能力有更多约束。</p>
-<p>Leyden 的方向更像是：保留 JVM 运行时，同时把一部分可以提前做的事情提前做。比如类加载链接、方法 profile、对象缓存，未来可能还有代码编译。</p>
-<p>所以我理解它们不是简单替代关系：</p>
+<p>如果本地能编译、CI 不能编译，或者 CI 能编译、运行镜像不能启动，后面所有压测都没有意义。</p>
+<h3 id="依赖和启动参数"><a href="#依赖和启动参数" class="headerlink" title="依赖和启动参数"></a>依赖和启动参数</h3><p>重点检查几类：</p>
 <ul>
-<li>Native Image 更激进，收益明显，约束也明显。</li>
-<li>Leyden 更温和，更适合大量依赖 JVM 动态性的传统 Java 服务。</li>
+<li>字节码增强、agent、APM、诊断工具。</li>
+<li>反射比较重的框架。</li>
+<li>数据库驱动、HTTP client、RPC client。</li>
+<li>老 JVM 参数，尤其是 GC 参数。</li>
+<li><code>--add-opens</code>、<code>--add-exports</code> 相关参数。</li>
 </ul>
-<p>相关背景可以看：</p>
-<ul>
-<li><a href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></li>
-<li><a href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></li>
-<li><a href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></li>
-</ul>
-<h2 id="6-我后面会重点关注什么"><a href="#6-我后面会重点关注什么" class="headerlink" title="6. 我后面会重点关注什么"></a>6. 我后面会重点关注什么</h2><ol>
-<li>JEP 491 后，虚拟线程在真实服务里的风险是否明显降低。</li>
-<li>JFR Method Timing &amp; Tracing 的生产使用方式和开销。</li>
-<li>Compact Object Headers 对对象密集型服务的实际内存收益。</li>
-<li>ZGC/Shenandoah 分代化之后的真实吞吐和延迟表现。</li>
-<li>Leyden 和 Spring Boot、CDS、jar 展开的集成路径。</li>
-<li>AOT profile/缓存能力对启动、预热、扩容速度的改善。</li>
+<p>JDK9 以后模块化逐步收紧，JDK17 以后强封装影响更明显。升级时遇到非法反射访问，不要一股脑放开所有模块，最好按报错最小化处理。</p>
+<h2 id="5-验证路径"><a href="#5-验证路径" class="headerlink" title="5. 验证路径"></a>5. 验证路径</h2><p>我比较推荐把升级拆成几个阶段：</p>
+<ol>
+<li>只升级运行时，不换 GC，不开虚拟线程。</li>
+<li>跑单元测试、集成测试、启动冒烟。</li>
+<li>压测 JDK21 + 原 GC，确认运行时升级本身没有问题。</li>
+<li>单独验证 JDK21 + 分代 ZGC。</li>
+<li>单独验证 JDK21 + 虚拟线程。</li>
+<li>小流量灰度，每次只打开一个变量。</li>
 </ol>
-<h2 id="7-小结"><a href="#7-小结" class="headerlink" title="7. 小结"></a>7. 小结</h2><p>JDK21 升级完以后，不代表这条线结束。</p>
-<p>JDK21 是一个适合落地的版本；JDK24/JDK25/JDK26 展示的是后续演进方向：虚拟线程更成熟、JFR 更强、GC 更偏分代化、对象布局更紧凑、Leyden 开始改善启动和预热。</p>
-<p>对应用团队来说，不需要盲目追每一个版本，但需要知道这些变化在解决什么问题。这样下一次升级就不是临时补课，而是持续演进。</p>
+<p>这样做的好处是问题好定位。否则 JDK 版本、GC、虚拟线程、依赖升级混在一起，一旦指标异常，很难判断到底是哪一个变量导致的。</p>
+<h2 id="6-回滚策略"><a href="#6-回滚策略" class="headerlink" title="6. 回滚策略"></a>6. 回滚策略</h2><p>回滚也要拆变量。</p>
+<p>如果虚拟线程有问题，优先关闭虚拟线程，不要直接回滚 JDK。<br>如果 ZGC 表现不符合预期，优先切回原 GC。<br>只有运行时兼容本身有问题，才需要回退 JDK。</p>
+<p>所以开关设计很重要。虚拟线程、GC、JDK 版本最好都有清晰的灰度和回退路径。</p>
+<h2 id="7-小结"><a href="#7-小结" class="headerlink" title="7. 小结"></a>7. 小结</h2><p>JDK21 升级的价值主要在三件事：</p>
+<ul>
+<li>ZGC：解决一类 GC pause 导致的长尾问题。</li>
+<li>虚拟线程：降低 IO 密集型服务的平台线程成本。</li>
+<li>生态：让应用站到新的 Java 生态基线上。</li>
+</ul>
+<p>但这些收益都不是自动拿到的。比较稳的做法是：先明确收益目标，再拆变量验证，最后用 JFR 和线上指标证明结果。</p>
 ]]></content>
       <categories>
         <category>Java</category>
@@ -467,9 +109,446 @@
         <tag>Java</tag>
         <tag>JDK21</tag>
         <tag>JVM</tag>
+        <tag>ZGC</tag>
+        <tag>Virtual Threads</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>JDK21 特性取舍：哪些值得生产关注，哪些暂缓</title>
+    <url>/2026/05/02/02-jdk21-feature-selection/</url>
+    <content><![CDATA[<p>注意：预览功能非必要不建议使用。</p>
+<p>这篇是对 JDK8 到 JDK21 之间一些特性的整理。下面的表格去除了大部分日常开发不需要感知的特性，并且按照我个人理解，根据重要性、影响程度、日常开发需要关注的程度做了排序，会比较主观。</p>
+<p>完整列表还是建议看官方：</p>
+<ul>
+<li><a href="https://openjdk.org/jeps/0">JEP Index</a></li>
+<li><a href="https://openjdk.org/projects/jdk/17/jeps-since-jdk-11">JEPs in JDK 17 integrated since JDK 11</a></li>
+<li><a href="https://openjdk.org/projects/jdk/21/jeps-since-jdk-17">JEPs in JDK 21 integrated since JDK 17</a></li>
+<li><a href="https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html">Oracle JDK 21 migration guide</a></li>
+</ul>
+<h2 id="1-语言和日常开发相关"><a href="#1-语言和日常开发相关" class="headerlink" title="1. 语言和日常开发相关"></a>1. 语言和日常开发相关</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/395">JEP 395: Records</a></td>
+<td>16</td>
+<td>充当不可变数据的载体，与元组形式类似，类结构很简单。DTO、事件对象、配置快照都比较适合。有一些序列化相关特性需要注意。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> / <a href="https://openjdk.org/jeps/394">JEP 394</a> / <a href="https://openjdk.org/jeps/440">JEP 440</a> / <a href="https://openjdk.org/jeps/441">JEP 441</a></td>
+<td>14 / 16 / 21 / 21</td>
+<td>对 switch 表达式、instanceof 类型转换、Record 模式匹配都做了简化。这个对代码可读性提升比较明显，但别把复杂业务全塞到一个 switch 里。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a></td>
+<td>10</td>
+<td><code>var</code> 可以用，但我建议只在上下文中能直接看出类型，或者具体类型不重要时使用。比如 Stream 里某些很长的泛型类型。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a></td>
+<td>15</td>
+<td>多行字符串，写 SQL、JSON、测试数据会舒服很多。动态 SQL 还是别靠字符串拼接。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a></td>
+<td>17</td>
+<td>密封类，可以限制哪些类或接口能继承/实现它。和 pattern matching 配合起来会比较自然。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a></td>
+<td>21</td>
+<td>提供了一套“有序集合”的标准接口。这个不是大特性，但补上了集合框架里长期不太顺手的一块。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/430">JEP 430: String Templates (Preview)</a></td>
+<td>21</td>
+<td>字符串模板这个方向很有意思，但在 JDK21 里是 Preview，后来也有重做方向。我不建议生产主链路开启。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/443">JEP 443: Unnamed Patterns and Variables (Preview)</a></td>
+<td>21</td>
+<td>未使用变量可以用 <code>_</code> 表示。语义上是好事，但 JDK21 中仍是 Preview。</td>
+</tr>
+</tbody></table>
+<p>上面这些里面，我认为 Records、Text Blocks、switch/pattern matching、Sequenced Collections 是可以逐步进入日常编码习惯的。Preview 功能可以学习，不建议作为生产代码的基础。</p>
+<h2 id="2-JVM-和-Compiler-相关"><a href="#2-JVM-和-Compiler-相关" class="headerlink" title="2. JVM 和 Compiler 相关"></a>2. JVM 和 Compiler 相关</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/377">ZGC</a> / <a href="https://openjdk.org/jeps/379">Shenandoah</a></td>
+<td>15</td>
+<td>ZGC 和 Shenandoah 发布生产版本。真正对 JDK21 升级有吸引力的是后面的分代 ZGC。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a></td>
+<td>21</td>
+<td>ZGC 支持分代了，提升很大。适合 GC 延迟敏感应用重点验证，但仍然要看吞吐、CPU、RSS。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/328">JEP 328: Flight Recorder</a></td>
+<td>11</td>
+<td>绝对的神器。JDK 升级、GC 选型、虚拟线程灰度都应该用 JFR 看证据。后面会单独写 JFR 实战。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/307">JEP 307: Parallel Full GC for G1</a></td>
+<td>10</td>
+<td>G1 的 Full GC 支持并行后，极端情况下的暂停问题会比以前好一些。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/158">JEP 158</a> / <a href="https://openjdk.org/jeps/271">JEP 271</a></td>
+<td>9</td>
+<td>统一 JVM 日志和统一 GC 日志。升级时旧 GC 日志参数要迁移到 <code>-Xlog</code>。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/345">JEP 345: NUMA-Aware Memory Allocation for G1</a></td>
+<td>14</td>
+<td>NUMA 场景下有意义，普通开发不一定直接感知。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/280">JEP 280: Indify String Concatenation</a></td>
+<td>9</td>
+<td>字符串拼接底层改成 invokedynamic。业务一般不用管，但说明高版本 JDK 在底层持续优化。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/312">JEP 312: Thread-Local Handshakes</a></td>
+<td>10</td>
+<td>某些 VM 操作不再总是需要全局安全点，对停顿控制有帮助。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/451">JEP 451: Prepare to Disallow the Dynamic Loading of Agents</a></td>
+<td>21</td>
+<td>未来会限制运行时动态加载 agent。监控、诊断、热修复相关工具都要提前验证。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/416">JEP 416: Reimplement Core Reflection with Method Handles</a></td>
+<td>18</td>
+<td>用 MethodHandles 重新实现反射。主要目的是规范化，部分场景变快，部分场景变慢，需要靠压测和 JFR 看。</td>
+</tr>
+</tbody></table>
+<p>这部分才是升级 JDK 时更应该关注的地方。语言特性只是表面，运行时行为变化才决定上线风险。</p>
+<h2 id="3-Loom、Panama-和其他能力"><a href="#3-Loom、Panama-和其他能力" class="headerlink" title="3. Loom、Panama 和其他能力"></a>3. Loom、Panama 和其他能力</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a></td>
+<td>21</td>
+<td>虚拟线程是 JDK21 最有吸引力的特性之一。IO 密集型服务值得重点看，但 JDK21 的 pinning 风险不能忽略。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/446">JEP 446: Scoped Values (Preview)</a></td>
+<td>21</td>
+<td>能在一些场景替代 ThreadLocal，但注意，它不是为了完全取代 ThreadLocal，也取代不了所有用法。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/453">JEP 453: Structured Concurrency (Preview)</a></td>
+<td>21</td>
+<td>提供任务组的结构化组织方式，和虚拟线程适配很好。JDK21 里还是 Preview，生产主链路谨慎。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/412">JEP 412: Foreign Function &amp; Memory API</a></td>
+<td>17</td>
+<td>Panama 对 JDK 的影响可能比 Loom 更底层，只是对上层业务开发没有那么直接。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/448">JEP 448: Vector API (Incubator)</a></td>
+<td>21</td>
+<td>SIMD 向量化。对 JSON 解析、压缩、数值计算这类基础库更有价值，普通业务不一定直接用。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/349">JEP 349: JFR Event Streaming</a></td>
+<td>14</td>
+<td>JFR 事件流，可以实现持续线上监控。虚拟线程 pinning 监控就很适合用它做。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/259">JEP 259: Stack-Walking API</a></td>
+<td>9</td>
+<td>比 <code>getStackTrace</code> 更灵活，可以按需处理 StackFrame。诊断工具和框架比较有用。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/250">JEP 250</a> / <a href="https://openjdk.org/jeps/310">JEP 310</a> / <a href="https://openjdk.org/jeps/341">JEP 341</a> / <a href="https://openjdk.org/jeps/350">JEP 350</a></td>
+<td>9 / 10 / 12 / 13</td>
+<td>CDS/AppCDS，可以改善启动和类加载成本，但要提前构建归档，工程化成本要考虑。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/193">JEP 193: Variable Handles</a></td>
+<td>9</td>
+<td>更细粒度的内存屏障控制，很多高性能库会用。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/254">JEP 254: Compact Strings</a></td>
+<td>9</td>
+<td>String 底层从 char 变成 byte，内存占用可能减少，但特定场景可能增加 CPU 开销。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/285">JEP 285: Spin-Wait Hints</a></td>
+<td>9</td>
+<td>自旋场景可以用 <code>Thread.onSpinWait()</code> 给 CPU 提示，不过要理解它不是业务性能银弹。</td>
+</tr>
+</tbody></table>
+<p>这里面我最关注的是 Virtual Threads、JFR Event Streaming 和 CDS。Panama/Vector API 很重要，但更偏底层库和基础设施。</p>
+<h2 id="4-废弃和删除"><a href="#4-废弃和删除" class="headerlink" title="4. 废弃和删除"></a>4. 废弃和删除</h2><p>升级时经常不是新特性出问题，而是老东西不见了。</p>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://openjdk.org/jeps/374">JEP 374: Deprecate and Disable Biased Locking</a></td>
+<td>15</td>
+<td>偏向锁被废弃并默认关闭。大部分应用不用管，但老参数要清理。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/363">JEP 363: Remove the Concurrent Mark Sweep (CMS) Garbage Collector</a></td>
+<td>14</td>
+<td>CMS 移除了。还在用 CMS 参数的服务会直接启动失败。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/366">JEP 366: Deprecate the ParallelScavenge + SerialOld GC Combination</a></td>
+<td>14</td>
+<td>一些旧 GC 组合不再推荐。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/410">JEP 410: Remove the Experimental AOT and JIT Compiler</a></td>
+<td>17</td>
+<td>移除了实验性质的 AOT 和 Graal JIT。需要 AOT/JIT 相关能力的直接看 GraalVM 或后续 Leyden。</td>
+</tr>
+<tr>
+<td><a href="https://openjdk.org/jeps/214">JEP 214: Remove GC Combinations Deprecated in JDK 8</a></td>
+<td>9</td>
+<td>一些 JDK8 已废弃的 GC 组合被删除。</td>
+</tr>
+</tbody></table>
+<p>这部分建议在升级前直接扫启动参数。很多服务的 JVM 参数是历史遗留，没人确定它现在是否还有意义。</p>
+<h2 id="5-模块化和兼容"><a href="#5-模块化和兼容" class="headerlink" title="5. 模块化和兼容"></a>5. 模块化和兼容</h2><p>JDK9 之后模块化是升级时必须关注的内容。</p>
+<p>简单说：</p>
+<ul>
+<li><code>exports</code> 影响编译期和链接期访问。</li>
+<li><code>opens</code> 影响运行期反射访问。</li>
+<li>如果用了未导出的 JDK 内部 API，编译期可能报错。</li>
+<li>如果反射访问了未开放的包，运行期可能报错。</li>
+</ul>
+<p>JDK9 开始有 <code>--illegal-access</code> 做运行时缓冲：</p>
+<ul>
+<li><code>--illegal-access=permit</code></li>
+<li><code>--illegal-access=warn</code></li>
+<li><code>--illegal-access=debug</code></li>
+<li><code>--illegal-access=deny</code></li>
+</ul>
+<p>但到了 JDK17，<a href="https://openjdk.org/jeps/403">JEP 403</a> 强封装 JDK internals，<code>--illegal-access</code> 基本不能再作为迁移缓冲。后面只能通过更明确的 <code>--add-opens</code> 控制运行时反射访问。</p>
+<p>我的建议是：</p>
+<ol>
+<li>能不用 JDK 内部 API 就不用。</li>
+<li>必须用的时候，最小范围加 <code>--add-opens</code> 或 <code>--add-exports</code>。</li>
+<li>不要直接复制一大串参数到所有应用。</li>
+</ol>
+<h2 id="6-适配和兼容相关"><a href="#6-适配和兼容相关" class="headerlink" title="6. 适配和兼容相关"></a>6. 适配和兼容相关</h2><p><a href="https://openjdk.org/jeps/247">JEP 247: Compile for Older Platform Versions</a> 提供 <code>--release</code>，可以更可靠地控制编译目标平台。维护多 JDK 版本兼容库时比较有用。</p>
+<p><a href="https://openjdk.org/jeps/238">JEP 238: Multi-Release JAR Files</a> 可以在不同 JDK 版本下使用不同 class。理论上很灵活，但实际使用要谨慎，复杂度不低。</p>
+<p>还有 Jakarta 迁移也要关注。很多老项目依赖过去 Java EE 相关包，升级时可能需要显式引入依赖，或者迁移坐标。</p>
+<h2 id="7-我的取舍"><a href="#7-我的取舍" class="headerlink" title="7. 我的取舍"></a>7. 我的取舍</h2><p>如果只从生产升级角度看，我会这么排：</p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>必看</td>
+<td>分代 ZGC、JFR、模块强封装、agent 行为变化</td>
+</tr>
+<tr>
+<td>值得采用</td>
+<td>Records、Text Blocks、switch/pattern matching、Sequenced Collections</td>
+</tr>
+<tr>
+<td>单独灰度</td>
+<td>Virtual Threads、JFR Event Streaming、CDS</td>
+</tr>
+<tr>
+<td>谨慎试点</td>
+<td>Scoped Values、Structured Concurrency、FFM、Vector API</td>
+</tr>
+<tr>
+<td>先不进主链路</td>
+<td>JDK21 中仍是 Preview/Incubator 的能力</td>
+</tr>
+</tbody></table>
+<p>结论还是那句话：JDK21 的价值不只是语法，真正影响生产升级的是运行时能力、观测能力和兼容性风险。</p>
+]]></content>
+      <categories>
+        <category>Java</category>
+      </categories>
+      <tags>
+        <tag>Java</tag>
+        <tag>JDK21</tag>
+        <tag>JVM</tag>
+        <tag>JEP</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>虚拟线程生产实践：收益、pinning 风险与排查方法</title>
+    <url>/2026/05/03/03-virtual-threads-production-practice/</url>
+    <content><![CDATA[<p>JDK21 的虚拟线程目前仍然有一些需要认真对待的风险。我的建议是：可以评估、可以灰度、可以在合适的 IO 密集型服务里用，但不要在可靠性要求很高的核心服务里一上来就大规模使用。</p>
+<p>这篇不是虚拟线程入门，而是我在做 JDK21 升级时对虚拟线程风险、监控和适配方式的整理。</p>
+<h2 id="1-简单介绍"><a href="#1-简单介绍" class="headerlink" title="1. 简单介绍"></a>1. 简单介绍</h2><p>虚拟线程使用一个专用的 ForkJoin 线程池，调度模式和 <code>parallelStream</code> 使用的公共 ForkJoinPool 不一样。</p>
+<p>它的并行度就是承载虚拟线程的平台线程数，默认与可用核心数相关，也可以通过参数调整：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.virtualThreadScheduler.parallelism=&lt;n&gt;</span><br></pre></td></tr></table></figure>
+
+<p>虚拟线程的核心价值是：阻塞时可以从平台线程上卸载，让平台线程继续执行其他虚拟线程。所以它适合 IO 密集型场景，而不是 CPU 密集型场景。</p>
+<p>虚拟线程也不再需要池化。虚拟线程很轻量，随用随建就行。</p>
+<p>但是线程池的一部分思想依然有效，例如控制访问资源的并发量。这类场景不应该再用复杂线程池复用线程，而是用 Semaphore、限流器、连接池等方式控制资源并发。</p>
+<h2 id="2-推荐先看的资料"><a href="#2-推荐先看的资料" class="headerlink" title="2. 推荐先看的资料"></a>2. 推荐先看的资料</h2><p>这些资料主要是理解虚拟线程设计和实现思路，具体实现还是以当前 JDK 为准：</p>
+<ul>
+<li><a href="https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html">https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html</a></li>
+<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html</a></li>
+<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html</a></li>
+<li><a href="https://inside.java/2021/05/10/networking-io-with-virtual-threads/">https://inside.java/2021/05/10/networking-io-with-virtual-threads/</a></li>
+<li><a href="https://inside.java/2020/08/07/loom-performance/">https://inside.java/2020/08/07/loom-performance/</a></li>
+<li><a href="https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads">https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads</a></li>
+<li><a href="https://inside.java/2023/08/26/continuations-under-the-covers/">https://inside.java/2023/08/26/continuations-under-the-covers/</a></li>
+</ul>
+<p>如果对异步编程的发展历史感兴趣，也可以看 Devoxx 相关分享：从线程到响应式，再到虚拟线程。</p>
+<h2 id="3-风险"><a href="#3-风险" class="headerlink" title="3. 风险"></a>3. 风险</h2><p>虚拟线程支持 ThreadLocal 和 <code>synchronized</code>，但支持不代表没有代价。JDK21 里主要需要注意两类问题：</p>
+<ol>
+<li>pinning，也就是虚拟线程被绑定在平台线程上。</li>
+<li>ThreadLocal 在线程数量模型变化后的放大问题。</li>
+</ol>
+<h3 id="3-1-绑定问题"><a href="#3-1-绑定问题" class="headerlink" title="3.1 绑定问题"></a>3.1 绑定问题</h3><p>JDK21 中，虚拟线程在 <code>synchronized</code> 块或 <code>synchronized</code> 方法中执行阻塞操作时，会和平台线程绑定。同步块内阻塞、等待同步锁，都可能 pin。</p>
+<p>另外，虚拟线程执行 native 代码或 foreign function 时也无法正常卸载。这类问题更难从业务代码表面看出来，典型场景之一是类加载。</p>
+<p><a href="https://openjdk.org/jeps/491">JEP 491</a> 在 JDK24 解决了 <code>synchronized</code> 导致虚拟线程 pinning 的主要问题，但如果你的生产运行时是 JDK21，就仍然要按 JDK21 的行为处理。</p>
+<h2 id="4-死锁风险"><a href="#4-死锁风险" class="headerlink" title="4. 死锁风险"></a>4. 死锁风险</h2><p>这块风险在很多介绍里容易被低估。大部分死锁本质上都可以归到一类问题：同步块内外存在同一资源竞争，同时同步块可能 pin 住平台线程。</p>
+<p>相关讨论可以参考：</p>
+<ul>
+<li><a href="https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/">https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/</a></li>
+<li><a href="https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html">https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html</a></li>
+<li><a href="https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html">https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html</a></li>
+</ul>
+<p>一个简化模型大概是这样：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> java.util.concurrent.locks.ReentrantLock;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">VirtualThreadPinningDemo</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">ReentrantLock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ReentrantLock</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">1</span>; i++) &#123;</span><br><span class="line">            Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">                doSomethingWithLock();</span><br><span class="line">                <span class="keyword">synchronized</span> (VirtualThreadPinningDemo.class) &#123;</span><br><span class="line">                    doSomethingWithLock();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        Thread.sleep(Long.MAX_VALUE);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doSomethingWithLock</span><span class="params">()</span> &#123;</span><br><span class="line">        lock.lock();</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            Thread.sleep(<span class="number">10</span>);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">            Thread.currentThread().interrupt();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            lock.unlock();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个代码的关键不是 <code>ReentrantLock</code> 本身，而是：</p>
+<ul>
+<li>同步块外部会竞争某个资源；</li>
+<li>同步块内部也会竞争同一个资源；</li>
+<li>同步块内的阻塞会 pin 住承载它的平台线程；</li>
+<li>平台线程数量是有限的。</li>
+</ul>
+<p>当所有平台线程都被 pinned 虚拟线程占住时，某个已经被 unpark 的虚拟线程可能没有平台线程可以继续执行。队列里真正能推进状态的虚拟线程又排在后面，最终就可能卡住。</p>
+<p>如果简化成一句话：<code>sync</code> 块内外出现同一资源竞争，是虚拟线程下非常需要小心的结构。</p>
+<h3 id="4-1-单线程调度器下更容易理解"><a href="#4-1-单线程调度器下更容易理解" class="headerlink" title="4.1 单线程调度器下更容易理解"></a>4.1 单线程调度器下更容易理解</h3><p>更简单的理解方式是：如果只有一个 carrier thread，vt1 拿到了 lock A 后遇到 IO 让出，vt2 进入 <code>synchronized</code> 后又去拿 lock A，并且在同步块里 pin 住唯一 carrier thread，那 vt1 就没机会回来释放 lock A。</p>
+<p>现实里 carrier thread 不止一个，所以不是每次都复现，但结构是一样的。</p>
+<h3 id="4-2-Native-或类加载导致的问题"><a href="#4-2-Native-或类加载导致的问题" class="headerlink" title="4.2 Native 或类加载导致的问题"></a>4.2 Native 或类加载导致的问题</h3><p>native/FFI 导致的 pinning 触发概率可能没那么高，但原理类似。比如类加载过程中和类加载外存在同一个锁、同一个资源竞争，就可能出现很难排查的问题。</p>
+<p>所以虚拟线程适配时，不能只扫业务里的 <code>synchronized</code>，还要关注依赖库、agent、驱动、类加载路径。</p>
+<h2 id="5-ThreadLocal"><a href="#5-ThreadLocal" class="headerlink" title="5. ThreadLocal"></a>5. ThreadLocal</h2><p>ThreadLocal 的问题主要在于线程模型变了。</p>
+<p>没有虚拟线程前，我们通常可以假定线程数不会太多。但虚拟线程打破了这个限制，一个系统可能同时存在非常多虚拟线程。</p>
+<p>因此 ThreadLocal 的数据量就可能非常大，这就是 ThreadLocal 的风险所在。用的时候注意一下就好，但不能完全忽略。</p>
+<p>这里也提一下 Scoped Values。有些人可能期望用 Scoped Values 完全替代 ThreadLocal，其实不现实。Scoped Values 更适合不可变上下文传递，但 ThreadLocal 被当作资源池、对象缓存、临时 buffer 使用时，就不是简单替换的问题。</p>
+<p>比较典型的风险场景：</p>
+<ul>
+<li>ThreadLocal 存大对象。</li>
+<li>ThreadLocal 没有 remove。</li>
+<li>使用 InheritableThreadLocal 传递上下文。</li>
+<li>日志、JSON、序列化、链路追踪框架里隐式使用 ThreadLocal。</li>
+<li>把 ThreadLocal 当成资源池。</li>
+</ul>
+<p>虚拟线程上线前，这些地方都应该扫一遍。</p>
+<h2 id="6-监控"><a href="#6-监控" class="headerlink" title="6. 监控"></a>6. 监控</h2><h3 id="6-1-JFR"><a href="#6-1-JFR" class="headerlink" title="6.1 JFR"></a>6.1 JFR</h3><p>可以使用 JFR 来观察虚拟线程在绑定时的挂起情况。</p>
+<p>几个事件需要重点看：</p>
+<ul>
+<li><code>jdk.VirtualThreadStart</code>：记录虚拟线程启动，默认关闭。</li>
+<li><code>jdk.VirtualThreadEnd</code>：记录虚拟线程结束，默认关闭。</li>
+<li><code>jdk.VirtualThreadPinned</code>：虚拟线程 pinned 在平台线程上时，如果阻塞超过阈值，会产生这个事件，默认开启。</li>
+<li><code>jdk.VirtualThreadSubmitFailed</code>：启动或唤醒虚拟线程失败，默认开启。</li>
+<li><code>jdk.JavaMonitorEnter</code>：monitor 竞争事件，辅助观察 <code>synchronized</code>。</li>
+</ul>
+<p>官方说明可以参考：</p>
+<ul>
+<li><a href="https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR">https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR</a></li>
+<li><a href="https://openjdk.org/jeps/349">https://openjdk.org/jeps/349</a></li>
+</ul>
+<h3 id="6-2-JFR-EventStream"><a href="#6-2-JFR-EventStream" class="headerlink" title="6.2 JFR EventStream"></a>6.2 JFR EventStream</h3><p>只靠命令行 dump JFR 文件会有几个问题：</p>
+<ol>
+<li>文件较大，获取长期监控数据不方便。</li>
+<li>dump 文件需要上机器处理，不够及时。</li>
+<li>一次通常只能看单机数据。</li>
+</ol>
+<p>所以更推荐使用 JFR EventStream，把关键事件直接接到日志和指标系统里。</p>
+<p>示例代码可以简化成这样：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordedEvent;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordingStream;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"><span class="keyword">import</span> java.util.logging.Logger;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">VirtualThreadJfrMonitor</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">Logger</span> <span class="variable">LOGGER</span> <span class="operator">=</span> Logger.getLogger(VirtualThreadJfrMonitor.class.getName());</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">VIRTUAL_THREAD_PINNED</span> <span class="operator">=</span> <span class="string">&quot;jdk.VirtualThreadPinned&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">JAVA_MONITOR_ENTER</span> <span class="operator">=</span> <span class="string">&quot;jdk.JavaMonitorEnter&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">init</span><span class="params">()</span> &#123;</span><br><span class="line">        Thread.ofVirtual().name(<span class="string">&quot;jfr-monitor&quot;</span>).start(VirtualThreadJfrMonitor::start);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">start</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> (<span class="type">var</span> <span class="variable">rs</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">RecordingStream</span>()) &#123;</span><br><span class="line">            rs.enable(VIRTUAL_THREAD_PINNED).withoutThreshold();</span><br><span class="line">            rs.enable(JAVA_MONITOR_ENTER).withThreshold(Duration.ofMillis(<span class="number">5</span>));</span><br><span class="line">            List.of(VIRTUAL_THREAD_PINNED, JAVA_MONITOR_ENTER)</span><br><span class="line">                    .forEach(name -&gt; rs.onEvent(name, event -&gt; doLog(event, name)));</span><br><span class="line">            rs.start();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doLog</span><span class="params">(RecordedEvent event, String eventName)</span> &#123;</span><br><span class="line">        <span class="type">var</span> <span class="variable">thread</span> <span class="operator">=</span> event.getThread();</span><br><span class="line">        LOGGER.warning(() -&gt; <span class="string">&quot;event=&quot;</span> + eventName</span><br><span class="line">                + <span class="string">&quot;, durationMs=&quot;</span> + event.getDuration().toMillis()</span><br><span class="line">                + <span class="string">&quot;, thread=&quot;</span> + (thread == <span class="literal">null</span> ? <span class="string">&quot;unknown&quot;</span> : thread.getJavaName())</span><br><span class="line">                + <span class="string">&quot;, virtual=&quot;</span> + (thread != <span class="literal">null</span> &amp;&amp; thread.isVirtual()));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>实际生产里，把 <code>doLog</code> 换成自己的日志和指标上报即可。</p>
+<p>这个事件的触发条件可以粗略理解为：线程在 pinned 情况下出现 park 操作，并且耗时超过 duration。</p>
+<p>需要注意：</p>
+<ol>
+<li>JFR 启动之前发生的 pin 事件可能会被忽略。</li>
+<li>如果问题发生在 agent premain 或非常早期的类加载里，应用内 EventStream 可能看不到。</li>
+<li>启动期也要看时，可以考虑 JVM 参数启动 JFR。</li>
+</ol>
+<h3 id="6-3-jdk-tracePinnedThreads"><a href="#6-3-jdk-tracePinnedThreads" class="headerlink" title="6.3 jdk.tracePinnedThreads"></a>6.3 <code>jdk.tracePinnedThreads</code></h3><p><code>-Djdk.tracePinnedThreads</code> 只能作为非生产排查手段，不建议长期在线上开。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.tracePinnedThreads=short</span><br><span class="line">-Djdk.tracePinnedThreads=full</span><br></pre></td></tr></table></figure>
+
+<p><code>full</code> 会打印完整堆栈，并突出 native frame 和持有 monitor 的 frame。<br><code>short</code> 只输出关键帧。</p>
+<p>这个参数很适合上线前排查 <code>synchronized</code>，但不要把它当成生产监控方案。生产监控还是优先用 JFR。</p>
+<h2 id="7-解决和适配思路"><a href="#7-解决和适配思路" class="headerlink" title="7. 解决和适配思路"></a>7. 解决和适配思路</h2><p>最好的解决方案当然是官方从底层解决 <code>synchronized</code> 与虚拟线程 pinning 的问题。JDK24 的 JEP 491 已经往这个方向走了。</p>
+<p>如果当前运行时还是 JDK21，可以考虑：</p>
+<ol>
+<li>尽量从 <code>synchronized</code> 迁移到 <code>ReentrantLock</code>，尤其是同步块里会阻塞的场景。</li>
+<li>不要在 <code>synchronized</code> 内做 IO、sleep、park、等待连接池。</li>
+<li>对于 <code>ConcurrentHashMap</code> 这类替换成本较高的场景，不要机械替换，需要看实际数据结构和性能影响。</li>
+<li>上线前用 JFR 和 <code>jdk.tracePinnedThreads</code> 找出明显 pinning 点。</li>
+<li>依赖库版本要单独验证，不要假设所有库都天然适配虚拟线程。</li>
+</ol>
+<p>排查时重点关注：</p>
+<ul>
+<li>sync 块内外出现同一资源竞争，这种可能造成死锁。</li>
+<li>sync 里面有 park，但没有内外资源竞争，这种主要影响性能。</li>
+<li>sync 里面没有 park，无竞争时影响不大，有竞争时可能导致性能变差。</li>
+<li>native/FFI/类加载/agent 相关绑定问题。</li>
+</ul>
+<h2 id="8-线程转储"><a href="#8-线程转储" class="headerlink" title="8. 线程转储"></a>8. 线程转储</h2><p>JDK21 中使用传统 <code>jstack -l &lt;pid&gt;</code> 不会拿到完整虚拟线程信息。</p>
+<p>原因也比较合理：虚拟线程数量可能非常多，原本扁平化的线程 dump 很难组织这些关系。引入结构化并发后更是如此。</p>
+<p>推荐使用：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">jcmd &lt;pid&gt; Thread.dump_to_file -format=json &lt;file&gt;</span><br></pre></td></tr></table></figure>
+
+<p>JSON 格式更适合表达虚拟线程和结构化任务关系。上线前最好确认团队使用的分析工具能看这种 dump。</p>
+<h2 id="9-小结"><a href="#9-小结" class="headerlink" title="9. 小结"></a>9. 小结</h2><p>虚拟线程很有价值，但 JDK21 上的生产落地不能只看收益。</p>
+<p>我的建议：</p>
+<ul>
+<li>IO 密集型服务可以优先试点。</li>
+<li>可靠性要求高的核心服务要谨慎。</li>
+<li><code>synchronized</code>、ThreadLocal、依赖库、agent 都要排查。</li>
+<li>生产监控优先用 JFR。</li>
+<li><code>jdk.tracePinnedThreads</code> 只做非生产排查。</li>
+</ul>
+<p>如果只能记住一句话：虚拟线程不是“开了就一定变快”的开关，它改变了线程成本模型，也会把过去隐藏在线程、锁和 ThreadLocal 里的问题放大。</p>
+]]></content>
+      <categories>
+        <category>Java</category>
+      </categories>
+      <tags>
+        <tag>Java</tag>
+        <tag>JDK21</tag>
+        <tag>JVM</tag>
+        <tag>Virtual Threads</tag>
+        <tag>Loom</tag>
         <tag>JFR</tag>
-        <tag>Leyden</tag>
-        <tag>AOT</tag>
       </tags>
   </entry>
   <entry>
@@ -771,141 +850,136 @@
       </tags>
   </entry>
   <entry>
-    <title>虚拟线程生产实践：收益、pinning 风险与排查方法</title>
-    <url>/2026/05/03/03-virtual-threads-production-practice/</url>
-    <content><![CDATA[<p>JDK21 的虚拟线程目前仍然有一些需要认真对待的风险。我的建议是：可以评估、可以灰度、可以在合适的 IO 密集型服务里用，但不要在可靠性要求很高的核心服务里一上来就大规模使用。</p>
-<p>这篇不是虚拟线程入门，而是我在做 JDK21 升级时对虚拟线程风险、监控和适配方式的整理。</p>
-<h2 id="1-简单介绍"><a href="#1-简单介绍" class="headerlink" title="1. 简单介绍"></a>1. 简单介绍</h2><p>虚拟线程使用一个专用的 ForkJoin 线程池，调度模式和 <code>parallelStream</code> 使用的公共 ForkJoinPool 不一样。</p>
-<p>它的并行度就是承载虚拟线程的平台线程数，默认与可用核心数相关，也可以通过参数调整：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.virtualThreadScheduler.parallelism=&lt;n&gt;</span><br></pre></td></tr></table></figure>
-
-<p>虚拟线程的核心价值是：阻塞时可以从平台线程上卸载，让平台线程继续执行其他虚拟线程。所以它适合 IO 密集型场景，而不是 CPU 密集型场景。</p>
-<p>虚拟线程也不再需要池化。虚拟线程很轻量，随用随建就行。</p>
-<p>但是线程池的一部分思想依然有效，例如控制访问资源的并发量。这类场景不应该再用复杂线程池复用线程，而是用 Semaphore、限流器、连接池等方式控制资源并发。</p>
-<h2 id="2-推荐先看的资料"><a href="#2-推荐先看的资料" class="headerlink" title="2. 推荐先看的资料"></a>2. 推荐先看的资料</h2><p>这些资料主要是理解虚拟线程设计和实现思路，具体实现还是以当前 JDK 为准：</p>
-<ul>
-<li><a href="https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html">https://cr.openjdk.org/~rpressler/loom/Loom-Proposal.html</a></li>
-<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part1.html</a></li>
-<li><a href="https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html">https://cr.openjdk.org/~rpressler/loom/loom/sol1_part2.html</a></li>
-<li><a href="https://inside.java/2021/05/10/networking-io-with-virtual-threads/">https://inside.java/2021/05/10/networking-io-with-virtual-threads/</a></li>
-<li><a href="https://inside.java/2020/08/07/loom-performance/">https://inside.java/2020/08/07/loom-performance/</a></li>
-<li><a href="https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads">https://blogs.oracle.com/javamagazine/post/going-inside-javas-project-loom-and-virtual-threads</a></li>
-<li><a href="https://inside.java/2023/08/26/continuations-under-the-covers/">https://inside.java/2023/08/26/continuations-under-the-covers/</a></li>
+    <title>从 JDK21 看到 JDK25：Leyden、JFR Method Timing 与虚拟线程后续演进</title>
+    <url>/2026/05/05/05-jdk25-leyden-follow-up/</url>
+    <content><![CDATA[<p>这篇是 JDK21 升级之后继续关注的一些方向，主要包括虚拟线程后续演进、JFR、GC、对象头压缩，以及 Leyden。</p>
+<p>JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。</p>
+<h2 id="1-JDK21-之后比较重要的变化"><a href="#1-JDK21-之后比较重要的变化" class="headerlink" title="1. JDK21 之后比较重要的变化"></a>1. JDK21 之后比较重要的变化</h2><h3 id="Loom"><a href="#Loom" class="headerlink" title="Loom"></a>Loom</h3><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>24</td>
+<td><a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a></td>
+<td>解决虚拟线程在 <code>synchronized</code> 上 pinning 的主要问题。JDK21 中虚拟线程最大的一类坑，后续版本已经在底层处理。</td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a></td>
+<td>Scoped Values 正式交付。它提供基于显式作用域的值传递方式，适合替代一部分 ThreadLocal 上下文传递场景。</td>
+</tr>
+</tbody></table>
+<p>JDK21 里虚拟线程已经正式可用，但如果从生产大规模使用的角度看，我认为 JDK24 的 JEP 491 非常关键。</p>
+<h3 id="JVM-相关"><a href="#JVM-相关" class="headerlink" title="JVM 相关"></a>JVM 相关</h3><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
+<td>Lilliput 项目的阶段性成果，把对象头压缩到更小。对象很多的应用可能会有内存收益，具体效果要看应用对象分布。</td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
+<td>Shenandoah 也进入分代方向。低延迟 GC 后面基本都在利用分代假说继续优化。</td>
+</tr>
+<tr>
+<td>25</td>
+<td><a href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
+<td>JFR 支持更细的方法级耗时 tracing。这个对线上分析很有吸引力，但生产开启范围和开销要认真控制。</td>
+</tr>
+<tr>
+<td>23 / 24</td>
+<td><a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> / <a href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
+<td>ZGC 后续只有分代模式。JDK21 先引入分代 ZGC，后面继续默认化、移除非分代模式。</td>
+</tr>
+</tbody></table>
+<p>这几个点说明一个趋势：JVM 还在持续降低延迟、降低内存占用、增强观测能力。JDK21 不是终点，只是一个比较适合落地的版本。</p>
+<h2 id="2-Leyden-相关进展"><a href="#2-Leyden-相关进展" class="headerlink" title="2. Leyden 相关进展"></a>2. Leyden 相关进展</h2><h3 id="已交付"><a href="#已交付" class="headerlink" title="已交付"></a>已交付</h3><ul>
+<li><a href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></li>
+<li><a href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></li>
+<li><a href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></li>
+<li><a href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></li>
 </ul>
-<p>如果对异步编程的发展历史感兴趣，也可以看 Devoxx 相关分享：从线程到响应式，再到虚拟线程。</p>
-<h2 id="3-风险"><a href="#3-风险" class="headerlink" title="3. 风险"></a>3. 风险</h2><p>虚拟线程支持 ThreadLocal 和 <code>synchronized</code>，但支持不代表没有代价。JDK21 里主要需要注意两类问题：</p>
-<ol>
-<li>pinning，也就是虚拟线程被绑定在平台线程上。</li>
-<li>ThreadLocal 在线程数量模型变化后的放大问题。</li>
+<p>这里和我最初整理时有一个变化：JEP 516 已经是 JDK26 delivered，不再是 doing 状态。所以如果只讨论 JDK25，需要把它放到“后续继续关注”的位置；如果讨论 Leyden 路线，就可以一起看。</p>
+<h3 id="继续关注"><a href="#继续关注" class="headerlink" title="继续关注"></a>继续关注</h3><ul>
+<li>AOT Code Compilation 相关草案。</li>
+<li>对更多 class loader 场景的支持。</li>
+<li>和 Spring Boot 打包、jar 展开、CDS 的工程化结合。</li>
+<li>启动参数、训练流程和正式启动流程的隔离。</li>
+</ul>
+<h2 id="3-核心-JEP-解读"><a href="#3-核心-JEP-解读" class="headerlink" title="3. 核心 JEP 解读"></a>3. 核心 JEP 解读</h2><h3 id="JEP-483：Ahead-of-Time-Class-Loading-amp-Linking"><a href="#JEP-483：Ahead-of-Time-Class-Loading-amp-Linking" class="headerlink" title="JEP 483：Ahead-of-Time Class Loading &amp; Linking"></a>JEP 483：Ahead-of-Time Class Loading &amp; Linking</h3><p>JEP 483 的核心是存储类加载和链接的训练数据。它关注的是应用启动时反复做的类加载、解析、链接工作，能不能提前做一部分。</p>
+<p>需要注意的是，它不是把 Java 变成 native 可执行文件，也不是直接消除 JVM 的动态性。它更像是让 JVM 在启动时少做一部分重复工作。</p>
+<p>我的理解：</p>
+<ul>
+<li>对启动速度和预热速度有帮助。</li>
+<li>对 lambda、框架启动、类加载较多的应用可能更明显。</li>
+<li>class loader 越复杂，落地越需要验证。</li>
+</ul>
+<h3 id="JEP-515：Ahead-of-Time-Method-Profiling"><a href="#JEP-515：Ahead-of-Time-Method-Profiling" class="headerlink" title="JEP 515：Ahead-of-Time Method Profiling"></a>JEP 515：Ahead-of-Time Method Profiling</h3><p>JEP 515 存储方法调用 profile，例如方法执行次数、调用路径等，让 JIT 在应用启动时就能知道一些历史执行情况。</p>
+<p>这个点很有意思。理想情况下，热点路径在首次触达时就可以更快进入较好的编译优化状态。</p>
+<p>但这里也有一个需要注意的地方：如果 JIT 更早知道热点路径，启动初期可能会更积极地做优化，CPU 资源消耗也可能更集中。所以即便有 AOT Method Profiling，流量接入也不一定能完全取消慢启动，只是慢启动可以更快、更可控。</p>
+<p>未来如果 AOT Code Compilation 继续推进，上面这个问题可能会继续改善。</p>
+<h3 id="JEP-514：Ahead-of-Time-Command-Line-Ergonomics"><a href="#JEP-514：Ahead-of-Time-Command-Line-Ergonomics" class="headerlink" title="JEP 514：Ahead-of-Time Command-Line Ergonomics"></a>JEP 514：Ahead-of-Time Command-Line Ergonomics</h3><p>JEP 514 主要是改善命令行体验，把训练/生成配置的流程包装得更顺一点。</p>
+<p>这个 JEP 本身不算最核心的性能能力，但对工程化很重要。AOT 相关能力如果使用成本太高，就很难真正进入普通服务发布流程。</p>
+<p>一个实际需要注意的问题是：训练阶段和正式启动阶段不要简单复用所有启动参数。比如管理端口、监控端口、临时目录、文件路径，都可能在训练生成阶段产生冲突。工程化时最好把“训练配置”和“正式运行配置”拆开。</p>
+<h3 id="JEP-516：Ahead-of-Time-Object-Caching-with-Any-GC"><a href="#JEP-516：Ahead-of-Time-Object-Caching-with-Any-GC" class="headerlink" title="JEP 516：Ahead-of-Time Object Caching with Any GC"></a>JEP 516：Ahead-of-Time Object Caching with Any GC</h3><p>JEP 516 是 JDK26 的内容，不属于 JDK25，但它很能说明 Leyden 的方向：不只是类加载和链接，后续还会把一些对象状态提前缓存。</p>
+<p>这个方向如果成熟，对启动和预热会有更大帮助。但具体能缓存什么、和应用框架如何结合、如何保证正确性，都需要继续观察。</p>
+<h2 id="4-目前比较大的问题"><a href="#4-目前比较大的问题" class="headerlink" title="4. 目前比较大的问题"></a>4. 目前比较大的问题</h2><h3 id="class-loader"><a href="#class-loader" class="headerlink" title="class loader"></a>class loader</h3><p>Leyden 相关能力很容易受 class loader 影响。</p>
+<p>简单 classpath 应用是一回事，真实服务经常还有：</p>
+<ul>
+<li>fat jar / nested jar。</li>
+<li>应用服务器 class loader。</li>
+<li>插件化 class loader。</li>
+<li>框架自定义 class loader。</li>
+<li>agent 或字节码增强。</li>
+</ul>
+<p>所以不要只看简单 demo 的效果。真实服务要看自己的打包方式和类加载路径。</p>
+<p>Spring Boot 这类框架已经在 jar 展开、CDS、AOT 方向做了一些工作，普通服务优先看框架集成会更稳。</p>
+<p>相关资料：</p>
+<ul>
+<li><a href="https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation">https://spring.io/blog/2024/08/29/spring-boot-cds-support-and-project-leyden-anticipation</a></li>
+<li><a href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></li>
+<li><a href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></li>
+</ul>
+<h3 id="GC-支持"><a href="#GC-支持" class="headerlink" title="GC 支持"></a>GC 支持</h3><p>早期 Leyden/AOT 能力和 GC 的配合有一些限制，后续 JEP 516 已经推进到 Any GC。这个方向需要继续跟。</p>
+<p>对业务应用来说，比较理想的状态是：不需要为了启动优化放弃原本选择的 GC。</p>
+<h3 id="训练流量"><a href="#训练流量" class="headerlink" title="训练流量"></a>训练流量</h3><p>AOT profile 类能力依赖训练数据。训练数据是否代表真实流量，会直接影响收益。</p>
+<p>如果训练流量和真实流量差异很大，可能只优化了启动路径，没优化真正的业务热点路径。对复杂服务来说，训练阶段如何设计是一个工程问题，不只是 JVM 参数问题。</p>
+<h2 id="5-Leyden-和-Native-Image-的区别"><a href="#5-Leyden-和-Native-Image-的区别" class="headerlink" title="5. Leyden 和 Native Image 的区别"></a>5. Leyden 和 Native Image 的区别</h2><p>Leyden 相比 Native Image，不会直接砍掉 JVM 的动态性。对普通 Java 应用来说，这一点很重要。</p>
+<p>Native Image 更像是基于 closed-world 假设，把应用提前编译成原生可执行文件。它启动快、内存占用低，但对反射、动态代理、运行时代码生成、类加载等能力有更多约束。</p>
+<p>Leyden 的方向更像是：保留 JVM 运行时，同时把一部分可以提前做的事情提前做。比如类加载链接、方法 profile、对象缓存，未来可能还有代码编译。</p>
+<p>所以我理解它们不是简单替代关系：</p>
+<ul>
+<li>Native Image 更激进，收益明显，约束也明显。</li>
+<li>Leyden 更温和，更适合大量依赖 JVM 动态性的传统 Java 服务。</li>
+</ul>
+<p>相关背景可以看：</p>
+<ul>
+<li><a href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></li>
+<li><a href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></li>
+<li><a href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></li>
+</ul>
+<h2 id="6-我后面会重点关注什么"><a href="#6-我后面会重点关注什么" class="headerlink" title="6. 我后面会重点关注什么"></a>6. 我后面会重点关注什么</h2><ol>
+<li>JEP 491 后，虚拟线程在真实服务里的风险是否明显降低。</li>
+<li>JFR Method Timing &amp; Tracing 的生产使用方式和开销。</li>
+<li>Compact Object Headers 对对象密集型服务的实际内存收益。</li>
+<li>ZGC/Shenandoah 分代化之后的真实吞吐和延迟表现。</li>
+<li>Leyden 和 Spring Boot、CDS、jar 展开的集成路径。</li>
+<li>AOT profile/缓存能力对启动、预热、扩容速度的改善。</li>
 </ol>
-<h3 id="3-1-绑定问题"><a href="#3-1-绑定问题" class="headerlink" title="3.1 绑定问题"></a>3.1 绑定问题</h3><p>JDK21 中，虚拟线程在 <code>synchronized</code> 块或 <code>synchronized</code> 方法中执行阻塞操作时，会和平台线程绑定。同步块内阻塞、等待同步锁，都可能 pin。</p>
-<p>另外，虚拟线程执行 native 代码或 foreign function 时也无法正常卸载。这类问题更难从业务代码表面看出来，典型场景之一是类加载。</p>
-<p><a href="https://openjdk.org/jeps/491">JEP 491</a> 在 JDK24 解决了 <code>synchronized</code> 导致虚拟线程 pinning 的主要问题，但如果你的生产运行时是 JDK21，就仍然要按 JDK21 的行为处理。</p>
-<h2 id="4-死锁风险"><a href="#4-死锁风险" class="headerlink" title="4. 死锁风险"></a>4. 死锁风险</h2><p>这块风险在很多介绍里容易被低估。大部分死锁本质上都可以归到一类问题：同步块内外存在同一资源竞争，同时同步块可能 pin 住平台线程。</p>
-<p>相关讨论可以参考：</p>
-<ul>
-<li><a href="https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/">https://www.reddit.com/r/java/comments/1512xuo/virtual_threads_interesting_deadlock/</a></li>
-<li><a href="https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html">https://mail.openjdk.org/pipermail/loom-dev/2023-July/005993.html</a></li>
-<li><a href="https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html">https://www.javaspecialists.eu/archive/Issue302-Virtual-Thread-Deadlocks.html</a></li>
-</ul>
-<p>一个简化模型大概是这样：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> java.util.concurrent.locks.ReentrantLock;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">VirtualThreadPinningDemo</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">ReentrantLock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ReentrantLock</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; Runtime.getRuntime().availableProcessors() + <span class="number">1</span>; i++) &#123;</span><br><span class="line">            Thread.startVirtualThread(() -&gt; &#123;</span><br><span class="line">                doSomethingWithLock();</span><br><span class="line">                <span class="keyword">synchronized</span> (VirtualThreadPinningDemo.class) &#123;</span><br><span class="line">                    doSomethingWithLock();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        Thread.sleep(Long.MAX_VALUE);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doSomethingWithLock</span><span class="params">()</span> &#123;</span><br><span class="line">        lock.lock();</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            Thread.sleep(<span class="number">10</span>);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">            Thread.currentThread().interrupt();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            lock.unlock();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这个代码的关键不是 <code>ReentrantLock</code> 本身，而是：</p>
-<ul>
-<li>同步块外部会竞争某个资源；</li>
-<li>同步块内部也会竞争同一个资源；</li>
-<li>同步块内的阻塞会 pin 住承载它的平台线程；</li>
-<li>平台线程数量是有限的。</li>
-</ul>
-<p>当所有平台线程都被 pinned 虚拟线程占住时，某个已经被 unpark 的虚拟线程可能没有平台线程可以继续执行。队列里真正能推进状态的虚拟线程又排在后面，最终就可能卡住。</p>
-<p>如果简化成一句话：<code>sync</code> 块内外出现同一资源竞争，是虚拟线程下非常需要小心的结构。</p>
-<h3 id="4-1-单线程调度器下更容易理解"><a href="#4-1-单线程调度器下更容易理解" class="headerlink" title="4.1 单线程调度器下更容易理解"></a>4.1 单线程调度器下更容易理解</h3><p>更简单的理解方式是：如果只有一个 carrier thread，vt1 拿到了 lock A 后遇到 IO 让出，vt2 进入 <code>synchronized</code> 后又去拿 lock A，并且在同步块里 pin 住唯一 carrier thread，那 vt1 就没机会回来释放 lock A。</p>
-<p>现实里 carrier thread 不止一个，所以不是每次都复现，但结构是一样的。</p>
-<h3 id="4-2-Native-或类加载导致的问题"><a href="#4-2-Native-或类加载导致的问题" class="headerlink" title="4.2 Native 或类加载导致的问题"></a>4.2 Native 或类加载导致的问题</h3><p>native/FFI 导致的 pinning 触发概率可能没那么高，但原理类似。比如类加载过程中和类加载外存在同一个锁、同一个资源竞争，就可能出现很难排查的问题。</p>
-<p>所以虚拟线程适配时，不能只扫业务里的 <code>synchronized</code>，还要关注依赖库、agent、驱动、类加载路径。</p>
-<h2 id="5-ThreadLocal"><a href="#5-ThreadLocal" class="headerlink" title="5. ThreadLocal"></a>5. ThreadLocal</h2><p>ThreadLocal 的问题主要在于线程模型变了。</p>
-<p>没有虚拟线程前，我们通常可以假定线程数不会太多。但虚拟线程打破了这个限制，一个系统可能同时存在非常多虚拟线程。</p>
-<p>因此 ThreadLocal 的数据量就可能非常大，这就是 ThreadLocal 的风险所在。用的时候注意一下就好，但不能完全忽略。</p>
-<p>这里也提一下 Scoped Values。有些人可能期望用 Scoped Values 完全替代 ThreadLocal，其实不现实。Scoped Values 更适合不可变上下文传递，但 ThreadLocal 被当作资源池、对象缓存、临时 buffer 使用时，就不是简单替换的问题。</p>
-<p>比较典型的风险场景：</p>
-<ul>
-<li>ThreadLocal 存大对象。</li>
-<li>ThreadLocal 没有 remove。</li>
-<li>使用 InheritableThreadLocal 传递上下文。</li>
-<li>日志、JSON、序列化、链路追踪框架里隐式使用 ThreadLocal。</li>
-<li>把 ThreadLocal 当成资源池。</li>
-</ul>
-<p>虚拟线程上线前，这些地方都应该扫一遍。</p>
-<h2 id="6-监控"><a href="#6-监控" class="headerlink" title="6. 监控"></a>6. 监控</h2><h3 id="6-1-JFR"><a href="#6-1-JFR" class="headerlink" title="6.1 JFR"></a>6.1 JFR</h3><p>可以使用 JFR 来观察虚拟线程在绑定时的挂起情况。</p>
-<p>几个事件需要重点看：</p>
-<ul>
-<li><code>jdk.VirtualThreadStart</code>：记录虚拟线程启动，默认关闭。</li>
-<li><code>jdk.VirtualThreadEnd</code>：记录虚拟线程结束，默认关闭。</li>
-<li><code>jdk.VirtualThreadPinned</code>：虚拟线程 pinned 在平台线程上时，如果阻塞超过阈值，会产生这个事件，默认开启。</li>
-<li><code>jdk.VirtualThreadSubmitFailed</code>：启动或唤醒虚拟线程失败，默认开启。</li>
-<li><code>jdk.JavaMonitorEnter</code>：monitor 竞争事件，辅助观察 <code>synchronized</code>。</li>
-</ul>
-<p>官方说明可以参考：</p>
-<ul>
-<li><a href="https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR">https://openjdk.org/jeps/425#JDK-Flight-Recorder-JFR</a></li>
-<li><a href="https://openjdk.org/jeps/349">https://openjdk.org/jeps/349</a></li>
-</ul>
-<h3 id="6-2-JFR-EventStream"><a href="#6-2-JFR-EventStream" class="headerlink" title="6.2 JFR EventStream"></a>6.2 JFR EventStream</h3><p>只靠命令行 dump JFR 文件会有几个问题：</p>
-<ol>
-<li>文件较大，获取长期监控数据不方便。</li>
-<li>dump 文件需要上机器处理，不够及时。</li>
-<li>一次通常只能看单机数据。</li>
-</ol>
-<p>所以更推荐使用 JFR EventStream，把关键事件直接接到日志和指标系统里。</p>
-<p>示例代码可以简化成这样：</p>
-<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordedEvent;</span><br><span class="line"><span class="keyword">import</span> jdk.jfr.consumer.RecordingStream;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.time.Duration;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"><span class="keyword">import</span> java.util.logging.Logger;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">VirtualThreadJfrMonitor</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">Logger</span> <span class="variable">LOGGER</span> <span class="operator">=</span> Logger.getLogger(VirtualThreadJfrMonitor.class.getName());</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">VIRTUAL_THREAD_PINNED</span> <span class="operator">=</span> <span class="string">&quot;jdk.VirtualThreadPinned&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">JAVA_MONITOR_ENTER</span> <span class="operator">=</span> <span class="string">&quot;jdk.JavaMonitorEnter&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">init</span><span class="params">()</span> &#123;</span><br><span class="line">        Thread.ofVirtual().name(<span class="string">&quot;jfr-monitor&quot;</span>).start(VirtualThreadJfrMonitor::start);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">start</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> (<span class="type">var</span> <span class="variable">rs</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">RecordingStream</span>()) &#123;</span><br><span class="line">            rs.enable(VIRTUAL_THREAD_PINNED).withoutThreshold();</span><br><span class="line">            rs.enable(JAVA_MONITOR_ENTER).withThreshold(Duration.ofMillis(<span class="number">5</span>));</span><br><span class="line">            List.of(VIRTUAL_THREAD_PINNED, JAVA_MONITOR_ENTER)</span><br><span class="line">                    .forEach(name -&gt; rs.onEvent(name, event -&gt; doLog(event, name)));</span><br><span class="line">            rs.start();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">doLog</span><span class="params">(RecordedEvent event, String eventName)</span> &#123;</span><br><span class="line">        <span class="type">var</span> <span class="variable">thread</span> <span class="operator">=</span> event.getThread();</span><br><span class="line">        LOGGER.warning(() -&gt; <span class="string">&quot;event=&quot;</span> + eventName</span><br><span class="line">                + <span class="string">&quot;, durationMs=&quot;</span> + event.getDuration().toMillis()</span><br><span class="line">                + <span class="string">&quot;, thread=&quot;</span> + (thread == <span class="literal">null</span> ? <span class="string">&quot;unknown&quot;</span> : thread.getJavaName())</span><br><span class="line">                + <span class="string">&quot;, virtual=&quot;</span> + (thread != <span class="literal">null</span> &amp;&amp; thread.isVirtual()));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>实际生产里，把 <code>doLog</code> 换成自己的日志和指标上报即可。</p>
-<p>这个事件的触发条件可以粗略理解为：线程在 pinned 情况下出现 park 操作，并且耗时超过 duration。</p>
-<p>需要注意：</p>
-<ol>
-<li>JFR 启动之前发生的 pin 事件可能会被忽略。</li>
-<li>如果问题发生在 agent premain 或非常早期的类加载里，应用内 EventStream 可能看不到。</li>
-<li>启动期也要看时，可以考虑 JVM 参数启动 JFR。</li>
-</ol>
-<h3 id="6-3-jdk-tracePinnedThreads"><a href="#6-3-jdk-tracePinnedThreads" class="headerlink" title="6.3 jdk.tracePinnedThreads"></a>6.3 <code>jdk.tracePinnedThreads</code></h3><p><code>-Djdk.tracePinnedThreads</code> 只能作为非生产排查手段，不建议长期在线上开。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">-Djdk.tracePinnedThreads=short</span><br><span class="line">-Djdk.tracePinnedThreads=full</span><br></pre></td></tr></table></figure>
-
-<p><code>full</code> 会打印完整堆栈，并突出 native frame 和持有 monitor 的 frame。<br><code>short</code> 只输出关键帧。</p>
-<p>这个参数很适合上线前排查 <code>synchronized</code>，但不要把它当成生产监控方案。生产监控还是优先用 JFR。</p>
-<h2 id="7-解决和适配思路"><a href="#7-解决和适配思路" class="headerlink" title="7. 解决和适配思路"></a>7. 解决和适配思路</h2><p>最好的解决方案当然是官方从底层解决 <code>synchronized</code> 与虚拟线程 pinning 的问题。JDK24 的 JEP 491 已经往这个方向走了。</p>
-<p>如果当前运行时还是 JDK21，可以考虑：</p>
-<ol>
-<li>尽量从 <code>synchronized</code> 迁移到 <code>ReentrantLock</code>，尤其是同步块里会阻塞的场景。</li>
-<li>不要在 <code>synchronized</code> 内做 IO、sleep、park、等待连接池。</li>
-<li>对于 <code>ConcurrentHashMap</code> 这类替换成本较高的场景，不要机械替换，需要看实际数据结构和性能影响。</li>
-<li>上线前用 JFR 和 <code>jdk.tracePinnedThreads</code> 找出明显 pinning 点。</li>
-<li>依赖库版本要单独验证，不要假设所有库都天然适配虚拟线程。</li>
-</ol>
-<p>排查时重点关注：</p>
-<ul>
-<li>sync 块内外出现同一资源竞争，这种可能造成死锁。</li>
-<li>sync 里面有 park，但没有内外资源竞争，这种主要影响性能。</li>
-<li>sync 里面没有 park，无竞争时影响不大，有竞争时可能导致性能变差。</li>
-<li>native/FFI/类加载/agent 相关绑定问题。</li>
-</ul>
-<h2 id="8-线程转储"><a href="#8-线程转储" class="headerlink" title="8. 线程转储"></a>8. 线程转储</h2><p>JDK21 中使用传统 <code>jstack -l &lt;pid&gt;</code> 不会拿到完整虚拟线程信息。</p>
-<p>原因也比较合理：虚拟线程数量可能非常多，原本扁平化的线程 dump 很难组织这些关系。引入结构化并发后更是如此。</p>
-<p>推荐使用：</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">jcmd &lt;pid&gt; Thread.dump_to_file -format=json &lt;file&gt;</span><br></pre></td></tr></table></figure>
-
-<p>JSON 格式更适合表达虚拟线程和结构化任务关系。上线前最好确认团队使用的分析工具能看这种 dump。</p>
-<h2 id="9-小结"><a href="#9-小结" class="headerlink" title="9. 小结"></a>9. 小结</h2><p>虚拟线程很有价值，但 JDK21 上的生产落地不能只看收益。</p>
-<p>我的建议：</p>
-<ul>
-<li>IO 密集型服务可以优先试点。</li>
-<li>可靠性要求高的核心服务要谨慎。</li>
-<li><code>synchronized</code>、ThreadLocal、依赖库、agent 都要排查。</li>
-<li>生产监控优先用 JFR。</li>
-<li><code>jdk.tracePinnedThreads</code> 只做非生产排查。</li>
-</ul>
-<p>如果只能记住一句话：虚拟线程不是“开了就一定变快”的开关，它改变了线程成本模型，也会把过去隐藏在线程、锁和 ThreadLocal 里的问题放大。</p>
+<h2 id="7-小结"><a href="#7-小结" class="headerlink" title="7. 小结"></a>7. 小结</h2><p>JDK21 升级完以后，不代表这条线结束。</p>
+<p>JDK21 是一个适合落地的版本；JDK24/JDK25/JDK26 展示的是后续演进方向：虚拟线程更成熟、JFR 更强、GC 更偏分代化、对象布局更紧凑、Leyden 开始改善启动和预热。</p>
+<p>对应用团队来说，不需要盲目追每一个版本，但需要知道这些变化在解决什么问题。这样下一次升级就不是临时补课，而是持续演进。</p>
 ]]></content>
       <categories>
         <category>Java</category>
@@ -914,411 +988,49 @@
         <tag>Java</tag>
         <tag>JDK21</tag>
         <tag>JVM</tag>
-        <tag>Virtual Threads</tag>
-        <tag>Loom</tag>
         <tag>JFR</tag>
+        <tag>Leyden</tag>
+        <tag>AOT</tag>
       </tags>
   </entry>
   <entry>
-    <title>JDK21 特性取舍：哪些值得生产关注，哪些暂缓</title>
-    <url>/2026/05/02/02-jdk21-feature-selection/</url>
-    <content><![CDATA[<p>注意：预览功能非必要不建议使用。</p>
-<p>这篇是对 JDK8 到 JDK21 之间一些特性的整理。下面的表格去除了大部分日常开发不需要感知的特性，并且按照我个人理解，根据重要性、影响程度、日常开发需要关注的程度做了排序，会比较主观。</p>
-<p>完整列表还是建议看官方：</p>
-<ul>
-<li><a href="https://openjdk.org/jeps/0">JEP Index</a></li>
-<li><a href="https://openjdk.org/projects/jdk/17/jeps-since-jdk-11">JEPs in JDK 17 integrated since JDK 11</a></li>
-<li><a href="https://openjdk.org/projects/jdk/21/jeps-since-jdk-17">JEPs in JDK 21 integrated since JDK 17</a></li>
-<li><a href="https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html">Oracle JDK 21 migration guide</a></li>
+    <title>MVCC与覆盖索引</title>
+    <url>/2022/08/25/MVCC%E4%B8%8E%E8%A6%86%E7%9B%96%E7%B4%A2%E5%BC%95/</url>
+    <content><![CDATA[<p>近期看到这样一个问题：<code>走覆盖索引不用回表，但是如何用MVCC判断可见性？因为二级索引上没有隐藏列trx_id和roll_ptr。而MVCC是基于trx_id和roll_ptr。那走覆盖索引如何判断是否可见呢?</code></p>
+<span id="more"></span>
+
+<h3 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h3><blockquote>
+<p>参考资料</p>
+<p><a href="https://www.modb.pro/db/173167">https://www.modb.pro/db/173167</a></p>
+<p><a href="https://www.zhihu.com/question/27674363/answer/38034982">https://www.zhihu.com/question/27674363/answer/38034982</a></p>
+<p>《Innodb存储引擎》</p>
+</blockquote>
+<p><strong>以下讨论基于Innodb的RR隔离级别</strong></p>
+<h4 id="聚簇索引行记录"><a href="#聚簇索引行记录" class="headerlink" title="聚簇索引行记录"></a>聚簇索引行记录</h4><p>根据《Innodb存储引擎》：InnoDB每行有隐藏列<strong>TransactionID</strong>和<strong>Roll Pointer</strong></p>
+<p>其中TransactionID是用于记录修改该记录的最新事务id，<strong>用于MVCC判断可见性及回滚</strong>。</p>
+<p>而Roll Pointer也就是回滚指针，用于配合undolog进行<strong>数据版本回溯</strong>。</p>
+<h4 id="二级索引记录"><a href="#二级索引记录" class="headerlink" title="二级索引记录"></a>二级索引记录</h4><p>问题中提到二级索引上没有隐藏列trx_id和roll_ptr，这的确是正确的。</p>
+<p>但二级索引的页面具有<strong>PAGE_MAX_TRX_ID</strong>，用于记录修改页内数据的最新事务id。</p>
+<p><strong>所以</strong></p>
+<p>如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；</p>
+<p>如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h3><p>二级索引的页面含有PAGE_MAX_TRX_ID用于记录修改页内数据的最新事务id，如果PAGE_MAX_TRX_ID的值是在Read View创建前提交的，那么该页的全部索引都可见；如果不是，则需要根据二级索引的主键进行回表，进行再次判断。</p>
+<p>所以覆盖索引不是总不需要回表的。</p>
+<h3 id="引申思考"><a href="#引申思考" class="headerlink" title="引申思考"></a>引申思考</h3><ul>
+<li><p>为什么二级索引要选择存储页面最新的事务id，而非单条索引记录的最新事务id？</p>
+<p>如果每条索引记录都存储最新事务id，那么可以减少不必要的回表，因为页内可能有一部分索引记录的最新事务是在当前事务创建之前提交的。</p>
+<p>而以页面为单位存储最新事务id可以减少索引记录的数据量。</p>
+<p>个人认为这是一种效率与空间之间的权衡。</p>
+</li>
 </ul>
-<h2 id="1-语言和日常开发相关"><a href="#1-语言和日常开发相关" class="headerlink" title="1. 语言和日常开发相关"></a>1. 语言和日常开发相关</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>我的理解</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/395">JEP 395: Records</a></td>
-<td>16</td>
-<td>充当不可变数据的载体，与元组形式类似，类结构很简单。DTO、事件对象、配置快照都比较适合。有一些序列化相关特性需要注意。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> / <a href="https://openjdk.org/jeps/394">JEP 394</a> / <a href="https://openjdk.org/jeps/440">JEP 440</a> / <a href="https://openjdk.org/jeps/441">JEP 441</a></td>
-<td>14 / 16 / 21 / 21</td>
-<td>对 switch 表达式、instanceof 类型转换、Record 模式匹配都做了简化。这个对代码可读性提升比较明显，但别把复杂业务全塞到一个 switch 里。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a></td>
-<td>10</td>
-<td><code>var</code> 可以用，但我建议只在上下文中能直接看出类型，或者具体类型不重要时使用。比如 Stream 里某些很长的泛型类型。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a></td>
-<td>15</td>
-<td>多行字符串，写 SQL、JSON、测试数据会舒服很多。动态 SQL 还是别靠字符串拼接。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a></td>
-<td>17</td>
-<td>密封类，可以限制哪些类或接口能继承/实现它。和 pattern matching 配合起来会比较自然。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a></td>
-<td>21</td>
-<td>提供了一套“有序集合”的标准接口。这个不是大特性，但补上了集合框架里长期不太顺手的一块。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/430">JEP 430: String Templates (Preview)</a></td>
-<td>21</td>
-<td>字符串模板这个方向很有意思，但在 JDK21 里是 Preview，后来也有重做方向。我不建议生产主链路开启。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/443">JEP 443: Unnamed Patterns and Variables (Preview)</a></td>
-<td>21</td>
-<td>未使用变量可以用 <code>_</code> 表示。语义上是好事，但 JDK21 中仍是 Preview。</td>
-</tr>
-</tbody></table>
-<p>上面这些里面，我认为 Records、Text Blocks、switch/pattern matching、Sequenced Collections 是可以逐步进入日常编码习惯的。Preview 功能可以学习，不建议作为生产代码的基础。</p>
-<h2 id="2-JVM-和-Compiler-相关"><a href="#2-JVM-和-Compiler-相关" class="headerlink" title="2. JVM 和 Compiler 相关"></a>2. JVM 和 Compiler 相关</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>我的理解</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/377">ZGC</a> / <a href="https://openjdk.org/jeps/379">Shenandoah</a></td>
-<td>15</td>
-<td>ZGC 和 Shenandoah 发布生产版本。真正对 JDK21 升级有吸引力的是后面的分代 ZGC。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a></td>
-<td>21</td>
-<td>ZGC 支持分代了，提升很大。适合 GC 延迟敏感应用重点验证，但仍然要看吞吐、CPU、RSS。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/328">JEP 328: Flight Recorder</a></td>
-<td>11</td>
-<td>绝对的神器。JDK 升级、GC 选型、虚拟线程灰度都应该用 JFR 看证据。后面会单独写 JFR 实战。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/307">JEP 307: Parallel Full GC for G1</a></td>
-<td>10</td>
-<td>G1 的 Full GC 支持并行后，极端情况下的暂停问题会比以前好一些。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/158">JEP 158</a> / <a href="https://openjdk.org/jeps/271">JEP 271</a></td>
-<td>9</td>
-<td>统一 JVM 日志和统一 GC 日志。升级时旧 GC 日志参数要迁移到 <code>-Xlog</code>。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/345">JEP 345: NUMA-Aware Memory Allocation for G1</a></td>
-<td>14</td>
-<td>NUMA 场景下有意义，普通开发不一定直接感知。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/280">JEP 280: Indify String Concatenation</a></td>
-<td>9</td>
-<td>字符串拼接底层改成 invokedynamic。业务一般不用管，但说明高版本 JDK 在底层持续优化。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/312">JEP 312: Thread-Local Handshakes</a></td>
-<td>10</td>
-<td>某些 VM 操作不再总是需要全局安全点，对停顿控制有帮助。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/451">JEP 451: Prepare to Disallow the Dynamic Loading of Agents</a></td>
-<td>21</td>
-<td>未来会限制运行时动态加载 agent。监控、诊断、热修复相关工具都要提前验证。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/416">JEP 416: Reimplement Core Reflection with Method Handles</a></td>
-<td>18</td>
-<td>用 MethodHandles 重新实现反射。主要目的是规范化，部分场景变快，部分场景变慢，需要靠压测和 JFR 看。</td>
-</tr>
-</tbody></table>
-<p>这部分才是升级 JDK 时更应该关注的地方。语言特性只是表面，运行时行为变化才决定上线风险。</p>
-<h2 id="3-Loom、Panama-和其他能力"><a href="#3-Loom、Panama-和其他能力" class="headerlink" title="3. Loom、Panama 和其他能力"></a>3. Loom、Panama 和其他能力</h2><table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>我的理解</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a></td>
-<td>21</td>
-<td>虚拟线程是 JDK21 最有吸引力的特性之一。IO 密集型服务值得重点看，但 JDK21 的 pinning 风险不能忽略。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/446">JEP 446: Scoped Values (Preview)</a></td>
-<td>21</td>
-<td>能在一些场景替代 ThreadLocal，但注意，它不是为了完全取代 ThreadLocal，也取代不了所有用法。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/453">JEP 453: Structured Concurrency (Preview)</a></td>
-<td>21</td>
-<td>提供任务组的结构化组织方式，和虚拟线程适配很好。JDK21 里还是 Preview，生产主链路谨慎。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/412">JEP 412: Foreign Function &amp; Memory API</a></td>
-<td>17</td>
-<td>Panama 对 JDK 的影响可能比 Loom 更底层，只是对上层业务开发没有那么直接。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/448">JEP 448: Vector API (Incubator)</a></td>
-<td>21</td>
-<td>SIMD 向量化。对 JSON 解析、压缩、数值计算这类基础库更有价值，普通业务不一定直接用。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/349">JEP 349: JFR Event Streaming</a></td>
-<td>14</td>
-<td>JFR 事件流，可以实现持续线上监控。虚拟线程 pinning 监控就很适合用它做。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/259">JEP 259: Stack-Walking API</a></td>
-<td>9</td>
-<td>比 <code>getStackTrace</code> 更灵活，可以按需处理 StackFrame。诊断工具和框架比较有用。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/250">JEP 250</a> / <a href="https://openjdk.org/jeps/310">JEP 310</a> / <a href="https://openjdk.org/jeps/341">JEP 341</a> / <a href="https://openjdk.org/jeps/350">JEP 350</a></td>
-<td>9 / 10 / 12 / 13</td>
-<td>CDS/AppCDS，可以改善启动和类加载成本，但要提前构建归档，工程化成本要考虑。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/193">JEP 193: Variable Handles</a></td>
-<td>9</td>
-<td>更细粒度的内存屏障控制，很多高性能库会用。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/254">JEP 254: Compact Strings</a></td>
-<td>9</td>
-<td>String 底层从 char 变成 byte，内存占用可能减少，但特定场景可能增加 CPU 开销。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/285">JEP 285: Spin-Wait Hints</a></td>
-<td>9</td>
-<td>自旋场景可以用 <code>Thread.onSpinWait()</code> 给 CPU 提示，不过要理解它不是业务性能银弹。</td>
-</tr>
-</tbody></table>
-<p>这里面我最关注的是 Virtual Threads、JFR Event Streaming 和 CDS。Panama/Vector API 很重要，但更偏底层库和基础设施。</p>
-<h2 id="4-废弃和删除"><a href="#4-废弃和删除" class="headerlink" title="4. 废弃和删除"></a>4. 废弃和删除</h2><p>升级时经常不是新特性出问题，而是老东西不见了。</p>
-<table>
-<thead>
-<tr>
-<th>Reference</th>
-<th>JDK Version</th>
-<th>影响</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://openjdk.org/jeps/374">JEP 374: Deprecate and Disable Biased Locking</a></td>
-<td>15</td>
-<td>偏向锁被废弃并默认关闭。大部分应用不用管，但老参数要清理。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/363">JEP 363: Remove the Concurrent Mark Sweep (CMS) Garbage Collector</a></td>
-<td>14</td>
-<td>CMS 移除了。还在用 CMS 参数的服务会直接启动失败。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/366">JEP 366: Deprecate the ParallelScavenge + SerialOld GC Combination</a></td>
-<td>14</td>
-<td>一些旧 GC 组合不再推荐。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/410">JEP 410: Remove the Experimental AOT and JIT Compiler</a></td>
-<td>17</td>
-<td>移除了实验性质的 AOT 和 Graal JIT。需要 AOT/JIT 相关能力的直接看 GraalVM 或后续 Leyden。</td>
-</tr>
-<tr>
-<td><a href="https://openjdk.org/jeps/214">JEP 214: Remove GC Combinations Deprecated in JDK 8</a></td>
-<td>9</td>
-<td>一些 JDK8 已废弃的 GC 组合被删除。</td>
-</tr>
-</tbody></table>
-<p>这部分建议在升级前直接扫启动参数。很多服务的 JVM 参数是历史遗留，没人确定它现在是否还有意义。</p>
-<h2 id="5-模块化和兼容"><a href="#5-模块化和兼容" class="headerlink" title="5. 模块化和兼容"></a>5. 模块化和兼容</h2><p>JDK9 之后模块化是升级时必须关注的内容。</p>
-<p>简单说：</p>
-<ul>
-<li><code>exports</code> 影响编译期和链接期访问。</li>
-<li><code>opens</code> 影响运行期反射访问。</li>
-<li>如果用了未导出的 JDK 内部 API，编译期可能报错。</li>
-<li>如果反射访问了未开放的包，运行期可能报错。</li>
-</ul>
-<p>JDK9 开始有 <code>--illegal-access</code> 做运行时缓冲：</p>
-<ul>
-<li><code>--illegal-access=permit</code></li>
-<li><code>--illegal-access=warn</code></li>
-<li><code>--illegal-access=debug</code></li>
-<li><code>--illegal-access=deny</code></li>
-</ul>
-<p>但到了 JDK17，<a href="https://openjdk.org/jeps/403">JEP 403</a> 强封装 JDK internals，<code>--illegal-access</code> 基本不能再作为迁移缓冲。后面只能通过更明确的 <code>--add-opens</code> 控制运行时反射访问。</p>
-<p>我的建议是：</p>
-<ol>
-<li>能不用 JDK 内部 API 就不用。</li>
-<li>必须用的时候，最小范围加 <code>--add-opens</code> 或 <code>--add-exports</code>。</li>
-<li>不要直接复制一大串参数到所有应用。</li>
-</ol>
-<h2 id="6-适配和兼容相关"><a href="#6-适配和兼容相关" class="headerlink" title="6. 适配和兼容相关"></a>6. 适配和兼容相关</h2><p><a href="https://openjdk.org/jeps/247">JEP 247: Compile for Older Platform Versions</a> 提供 <code>--release</code>，可以更可靠地控制编译目标平台。维护多 JDK 版本兼容库时比较有用。</p>
-<p><a href="https://openjdk.org/jeps/238">JEP 238: Multi-Release JAR Files</a> 可以在不同 JDK 版本下使用不同 class。理论上很灵活，但实际使用要谨慎，复杂度不低。</p>
-<p>还有 Jakarta 迁移也要关注。很多老项目依赖过去 Java EE 相关包，升级时可能需要显式引入依赖，或者迁移坐标。</p>
-<h2 id="7-我的取舍"><a href="#7-我的取舍" class="headerlink" title="7. 我的取舍"></a>7. 我的取舍</h2><p>如果只从生产升级角度看，我会这么排：</p>
-<table>
-<thead>
-<tr>
-<th>优先级</th>
-<th>特性</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>必看</td>
-<td>分代 ZGC、JFR、模块强封装、agent 行为变化</td>
-</tr>
-<tr>
-<td>值得采用</td>
-<td>Records、Text Blocks、switch/pattern matching、Sequenced Collections</td>
-</tr>
-<tr>
-<td>单独灰度</td>
-<td>Virtual Threads、JFR Event Streaming、CDS</td>
-</tr>
-<tr>
-<td>谨慎试点</td>
-<td>Scoped Values、Structured Concurrency、FFM、Vector API</td>
-</tr>
-<tr>
-<td>先不进主链路</td>
-<td>JDK21 中仍是 Preview/Incubator 的能力</td>
-</tr>
-</tbody></table>
-<p>结论还是那句话：JDK21 的价值不只是语法，真正影响生产升级的是运行时能力、观测能力和兼容性风险。</p>
 ]]></content>
       <categories>
-        <category>Java</category>
+        <category>MySQL</category>
       </categories>
       <tags>
-        <tag>Java</tag>
-        <tag>JDK21</tag>
-        <tag>JVM</tag>
-        <tag>JEP</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>JDK21 升级实践：从收益判断到落地路径</title>
-    <url>/2026/05/01/01-jdk21-upgrade-practice/</url>
-    <content><![CDATA[<p>当前升级 JDK 的动力实际上主要来自三项：ZGC、虚拟线程、衍生生态。</p>
-<p>这篇先不做 JDK21 新特性大全，只讨论“什么应用适合升级”“升级到底能拿到什么收益”“实际落地时先关注哪些风险”。特性细节和虚拟线程/JFR 会放到后面的文章单独展开。</p>
-<h2 id="1-总体分析"><a href="#1-总体分析" class="headerlink" title="1. 总体分析"></a>1. 总体分析</h2><h3 id="ZGC"><a href="#ZGC" class="headerlink" title="ZGC"></a>ZGC</h3><p>优点：ZGC 基本消除了 GC 带来的延迟，并且对大对象有更好的处理。</p>
-<p>不足：ZGC 吞吐量比不上 G1。即便分代 ZGC 的吞吐已经有了很大提升，但与 G1 依然有一定差距，所以不能只看 pause time。</p>
-<p>我的判断是：如果应用的主要问题是 GC 导致的长尾，ZGC 很值得测；如果应用本身更看重极限吞吐，或者 GC 本来就不是瓶颈，那升级收益未必明显。</p>
-<h3 id="虚拟线程"><a href="#虚拟线程" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>优点：适用于 IO 密集型应用。一方面可以提高系统性能，另一方面可以极大消除线程带来的内存压力。</p>
-<p>不足：JDK21 里的虚拟线程坑还比较多，尤其是 <code>synchronized</code> pinning、ThreadLocal 使用方式变化、依赖库兼容性等问题。可靠性要求很高的应用，不建议一上来就大规模启用。</p>
-<p>这里要强调一点：升级到 JDK21 和启用虚拟线程应该拆开。JDK21 可以先升，虚拟线程应该单独灰度。</p>
-<h3 id="衍生生态"><a href="#衍生生态" class="headerlink" title="衍生生态"></a>衍生生态</h3><p>许多 Java 生态框架都在逐步提高基线版本，低 JDK 版本的维护会越来越弱。如果想探索基于高版本 JDK 的框架和工具链，升级 JDK 基本是绕不开的。</p>
-<p>这类收益不一定马上体现在接口耗时上，但会体现在后续框架升级、依赖治理、工具链维护成本上。</p>
-<h2 id="2-什么应用适合升级-JDK"><a href="#2-什么应用适合升级-JDK" class="headerlink" title="2. 什么应用适合升级 JDK"></a>2. 什么应用适合升级 JDK</h2><table>
-<thead>
-<tr>
-<th>目标</th>
-<th>适用应用</th>
-<th>具体版本/策略</th>
-<th>风险</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>ZGC</td>
-<td>GC 延迟敏感的应用，例如缓存应用；本地有大缓存、频繁生成大对象的应用</td>
-<td>如果对吞吐追求不高，可以考虑 JDK17 以上；如果对吞吐有更高要求，优先验证 JDK21 分代 ZGC</td>
-<td>分代 ZGC 需要充分压测，不要只看暂停时间</td>
-</tr>
-<tr>
-<td>虚拟线程</td>
-<td>IO 密集型应用，文件 IO 场景需要单独验证</td>
-<td>JDK21 可用，但建议独立开关、独立灰度</td>
-<td><code>synchronized</code> pinning 可能降低吞吐，严重时可能造成死锁</td>
-</tr>
-<tr>
-<td>衍生生态</td>
-<td>需要使用高版本框架、工具链或运行时能力的应用</td>
-<td>根据框架要求决定</td>
-<td>依赖兼容、构建插件、运行参数都要重新检查</td>
-</tr>
-</tbody></table>
-<p>这张表其实是我对升级优先级的判断：先找收益目标，再决定升级策略。不要为了“统一版本”就把所有能力一起打开。</p>
-<h2 id="3-实际收益"><a href="#3-实际收益" class="headerlink" title="3. 实际收益"></a>3. 实际收益</h2><h3 id="分代-ZGC"><a href="#分代-ZGC" class="headerlink" title="分代 ZGC"></a>分代 ZGC</h3><p>一个比较典型的场景是缓存型服务。服务本地保留了较多数据，接口响应时间本身不慢，但尾延迟容易被 GC pause 拉高。</p>
-<p>这类服务升级到 JDK21 并使用分代 ZGC 后，比较明显的收益是长尾响应耗时收敛。在没有观察到资源占用异常提高的前提下，GC 带来的尾延迟问题得到了缓解。</p>
-<p>这里有几个观察点：</p>
-<ul>
-<li>不要只看平均耗时，要看 P95/P99。</li>
-<li>不要只看 GC pause，要同时看 CPU、RSS、吞吐。</li>
-<li>同口径对比很重要，最好是同一类实例、同一类流量、同一段时间窗口。</li>
-</ul>
-<p>分代 ZGC 的价值不是“所有服务都会变快”，而是它能解决一类非常明确的问题：GC pause 导致的长尾。</p>
-<h3 id="虚拟线程-1"><a href="#虚拟线程-1" class="headerlink" title="虚拟线程"></a>虚拟线程</h3><p>另一个试点场景是 IO 密集型接口服务。启用虚拟线程后，平台线程数从数千量级降到了数百量级，部分接口 P95 有十几个百分点的改善。</p>
-<p>这个结果和预期是吻合的：虚拟线程降低的是阻塞式并发模型下的平台线程成本。大量时间花在远程调用、数据库访问、缓存访问上的服务，更容易看到收益。</p>
-<p>但这里不能只看收益。虚拟线程上线前必须看这些东西：</p>
-<ul>
-<li>是否有大量 <code>synchronized</code> 块或方法。</li>
-<li><code>synchronized</code> 里是否有 IO、sleep、park 或锁竞争。</li>
-<li>ThreadLocal 是否持有大对象或资源对象。</li>
-<li>HTTP client、数据库驱动、RPC 框架是否验证过虚拟线程兼容性。</li>
-<li>是否能通过 JFR 看到 <code>jdk.VirtualThreadPinned</code>。</li>
-</ul>
-<p>我的建议是：虚拟线程不要和 JDK21 升级同时作为一个变量上线。先证明应用在 JDK21 下稳定，再开启虚拟线程灰度。</p>
-<h2 id="4-升级前准备"><a href="#4-升级前准备" class="headerlink" title="4. 升级前准备"></a>4. 升级前准备</h2><p>准备工作不复杂，但容易漏。</p>
-<h3 id="IDE-和本地环境"><a href="#IDE-和本地环境" class="headerlink" title="IDE 和本地环境"></a>IDE 和本地环境</h3><p>IDE 要能正确支持 JDK21 的语法、编译、调试和运行配置。这里不展开具体版本，直接看 IDE 官方对 JDK 版本的支持矩阵即可。</p>
-<h3 id="Maven-Gradle"><a href="#Maven-Gradle" class="headerlink" title="Maven/Gradle"></a>Maven/Gradle</h3><p>构建工具和插件要重点看：</p>
-<ul>
-<li>compiler plugin 是否支持 JDK21。</li>
-<li>surefire/failsafe 是否能在 JDK21 下正常跑测试。</li>
-<li>依赖解析是否受 IDE 或 Maven 版本影响。</li>
-<li>CI 使用的 JDK 和本地是否一致。</li>
-</ul>
-<p>如果本地能编译、CI 不能编译，或者 CI 能编译、运行镜像不能启动，后面所有压测都没有意义。</p>
-<h3 id="依赖和启动参数"><a href="#依赖和启动参数" class="headerlink" title="依赖和启动参数"></a>依赖和启动参数</h3><p>重点检查几类：</p>
-<ul>
-<li>字节码增强、agent、APM、诊断工具。</li>
-<li>反射比较重的框架。</li>
-<li>数据库驱动、HTTP client、RPC client。</li>
-<li>老 JVM 参数，尤其是 GC 参数。</li>
-<li><code>--add-opens</code>、<code>--add-exports</code> 相关参数。</li>
-</ul>
-<p>JDK9 以后模块化逐步收紧，JDK17 以后强封装影响更明显。升级时遇到非法反射访问，不要一股脑放开所有模块，最好按报错最小化处理。</p>
-<h2 id="5-验证路径"><a href="#5-验证路径" class="headerlink" title="5. 验证路径"></a>5. 验证路径</h2><p>我比较推荐把升级拆成几个阶段：</p>
-<ol>
-<li>只升级运行时，不换 GC，不开虚拟线程。</li>
-<li>跑单元测试、集成测试、启动冒烟。</li>
-<li>压测 JDK21 + 原 GC，确认运行时升级本身没有问题。</li>
-<li>单独验证 JDK21 + 分代 ZGC。</li>
-<li>单独验证 JDK21 + 虚拟线程。</li>
-<li>小流量灰度，每次只打开一个变量。</li>
-</ol>
-<p>这样做的好处是问题好定位。否则 JDK 版本、GC、虚拟线程、依赖升级混在一起，一旦指标异常，很难判断到底是哪一个变量导致的。</p>
-<h2 id="6-回滚策略"><a href="#6-回滚策略" class="headerlink" title="6. 回滚策略"></a>6. 回滚策略</h2><p>回滚也要拆变量。</p>
-<p>如果虚拟线程有问题，优先关闭虚拟线程，不要直接回滚 JDK。<br>如果 ZGC 表现不符合预期，优先切回原 GC。<br>只有运行时兼容本身有问题，才需要回退 JDK。</p>
-<p>所以开关设计很重要。虚拟线程、GC、JDK 版本最好都有清晰的灰度和回退路径。</p>
-<h2 id="7-小结"><a href="#7-小结" class="headerlink" title="7. 小结"></a>7. 小结</h2><p>JDK21 升级的价值主要在三件事：</p>
-<ul>
-<li>ZGC：解决一类 GC pause 导致的长尾问题。</li>
-<li>虚拟线程：降低 IO 密集型服务的平台线程成本。</li>
-<li>生态：让应用站到新的 Java 生态基线上。</li>
-</ul>
-<p>但这些收益都不是自动拿到的。比较稳的做法是：先明确收益目标，再拆变量验证，最后用 JFR 和线上指标证明结果。</p>
-]]></content>
-      <categories>
-        <category>Java</category>
-      </categories>
-      <tags>
-        <tag>Java</tag>
-        <tag>JDK21</tag>
-        <tag>JVM</tag>
-        <tag>ZGC</tag>
-        <tag>Virtual Threads</tag>
+        <tag>MySQL</tag>
+        <tag>MVCC</tag>
+        <tag>索引</tag>
       </tags>
   </entry>
   <entry>
@@ -1403,6 +1115,294 @@
       <tags>
         <tag>ThreadLocal</tag>
         <tag>FastThreadLocal</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>一个关于二级索引的优化思路</title>
+    <url>/2022/08/26/%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E7%9A%84%E5%9B%B0%E6%83%91/</url>
+    <content><![CDATA[<p>一个今年春招至今没解决的疑问（目前已经解决！感谢大佬们的解答和肯定！）</p>
+<span id="more"></span>
+
+<h2 id="开端"><a href="#开端" class="headerlink" title="开端"></a>开端</h2><blockquote>
+<p>以下讨论范围是以B+树为数据结构的索引</p>
+<p>并且不考虑二级索引关于事务版本的的字段可见性问题</p>
+</blockquote>
+<p>对于聚簇索引，非叶子节点的记录包括<strong>主键列</strong>，而叶子节点中的记录包括<strong>全部数据列（包括主键）</strong>。</p>
+<p>对于自己建立的二级索引（辅助索引），非叶子节点的记录<strong>包括索引列</strong>，而叶子节点中的记录包括<strong>主键以及索引列</strong>。</p>
+<p><strong>接下来我们只考虑除主键列外的其他列</strong></p>
+<p>对比可以看出，聚簇索引的与叶子节点与非叶子节点记录明显是不对等的，叶子节点的记录包含比非叶子节点记录更多的列。</p>
+<p>而二级索引非叶子节点包含的记录的列则与叶子节点中记录所包含的列一致。</p>
+<p><strong>不难看出，除了聚簇索引外建立的索引都只能属于后者。</strong></p>
+<p><strong>那么考虑下面这种情况</strong></p>
+<p>有一个表 t_bl 有以下字段 (id,a,b）</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> a,b <span class="keyword">from</span> t_bl <span class="keyword">where</span> a <span class="operator">=</span> &quot;XXX&quot;;</span><br></pre></td></tr></table></figure>
+
+<p>这种情况下b字段并不作为检索的依据，但却需要在检索结果中出现。</p>
+<p>那么有以下两种索引建立方案</p>
+<ol>
+<li><p><strong>建立 a 字段的索引</strong></p>
+<p><strong>优点</strong>：使得索引的每个节点都减少了存储 b 字段的空间开销。</p>
+<p><strong>缺点</strong>：返回查询结果需要通过二级索引的主键 id 回表到聚簇索引上查询 b 字段的值，影响查询性能。</p>
+</li>
+<li><p><strong>建立 a,b 字段的联合索引</strong></p>
+<p><strong>优点</strong>：可以用到覆盖索引，减少回表，提高查询效率。</p>
+<p><strong>缺点</strong>：使得二级索引中的每个非节点都增加了存储 b 字段的不必要的空间开销（因为b字段并不是检索依据）。</p>
+<blockquote>
+<p>9.16补充：这种非叶子节点上的索引数据空间的额外开销还会导致扇出的降低</p>
+</blockquote>
+</li>
+</ol>
+<p>那么为什么不提供一种机制，使得用户能建立非叶子节点与叶子节点不对等的索引？</p>
+<p>比如在本例中，用户更好的选择其实是建立一个<strong>非叶子节点存储 a 字段</strong>，而<strong>叶子节点存储 a,b 两个字段的索引</strong>。</p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a><strong>思考</strong></h2><p>innodb B+树索引页面大小默认是16kb，索引单位越小扇出越大。</p>
+<p>一个三层，扇出为100的 B+ 树，按照页面为单位，第三层假设10000个页，那么第二层就是100个页，第一层为1个页。</p>
+<p><strong>因此实际上叶子节点才是索引结构的主要空间开销，导致这个优化的收益并不是很高。</strong></p>
+<h2 id="大佬提供的思路"><a href="#大佬提供的思路" class="headerlink" title="大佬提供的思路"></a>大佬提供的思路</h2><p><strong>在此感谢公众号「一树一溪」大佬提供的思路</strong></p>
+<blockquote>
+<p>这位大佬专门写 MySQL 源码文章，感兴趣的朋友，可以微信搜索关注</p>
+</blockquote>
+<ol>
+<li>代码实现复杂度更高，如果支持这种非对称索引，相当于 B+ 树多了另一种索引结构，需要兼容。</li>
+<li>支持这种非对称结构并不会带来很大的好处，因为少量回表并不会对性能有太大影响，只要把回表次数控制在一定范围内就没问题。</li>
+<li>如果为了减少回表建了很多这种非对称索引，在计算执行成本的时候，这些索引都要考虑进去的，在查询优化阶段反而会增加花费的时间。</li>
+</ol>
+<p><strong>根据 Bill Karwin（《SQL反模式》作者 ）的<a href="https://stackoverflow.com/questions/73524637/build-secondary-indexes-more-freely/73524732#73524732">回答</a></strong></p>
+<p>目前<strong>Microsoft SQL Server</strong>已经实现了这个功能</p>
+<p><a href="https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16">https://docs.microsoft.com/en-us/sql/relational-databases/indexes/create-indexes-with-included-columns?view=sql-server-ver16</a></p>
+<p>而InnoDB 目前还没有实现这个可行的优化，猜想应该是因为优先级不高。</p>
+<p><strong>如果有其他思路，欢迎评论交流！</strong></p>
+]]></content>
+      <categories>
+        <category>MySQL</category>
+        <category>疑问</category>
+      </categories>
+      <tags>
+        <tag>MySQL</tag>
+        <tag>索引</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>常量池详解</title>
+    <url>/2022/06/25/%E5%B8%B8%E9%87%8F%E6%B1%A0%E8%AF%A6%E8%A7%A3/</url>
+    <content><![CDATA[<h2 id="关于常量池"><a href="#关于常量池" class="headerlink" title="关于常量池"></a>关于常量池</h2><h3 id="常量池-Class常量池（Constant-pool）"><a href="#常量池-Class常量池（Constant-pool）" class="headerlink" title="常量池/Class常量池（Constant pool）"></a>常量池/Class常量池（Constant pool）</h3><p>常量池,也叫 Class 常量池(常量池 == Class常量池)。Java文件被编译成 Class文件，Class文件中除了包含类的版本、字段、方法、接口等描述信息外，还有一项就是常量池，常量池是当Class文件被Java虚拟机加载进来后存放在方法区 各种字面量 (Literal)和 符号引用 。</p>
+<span id="more"></span>
+
+<p><img src="image-20220825185951061.png" alt="image-20220825185951061"></p>
+<h3 id="运行时常量池（Runtime-constant-pool）"><a href="#运行时常量池（Runtime-constant-pool）" class="headerlink" title="运行时常量池（Runtime constant pool）"></a>运行时常量池（Runtime constant pool）</h3><p>运行时常量池是方法区的一部分。运行时常量池是当Class文件被加载到内存后，Java虚拟机会 **将Class文件常量池里的内容转移到运行时常量池里(运行时常量池也是每个类都有一个)**。运行时常量池相对于Class文件常量池的另外一个重要特征是具备动态性，Java语言并不要求常量一定只有编译期才能产生，也就是并非预置入Class文件中常量池的内容才能进入方法区运行时常量池，运行期间也可能将新的常量放入池中</p>
+<p><strong>只存放字符串引用</strong></p>
+<p><img src="watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQ1NzM3MDY4,size_16,color_FFFFFF,t_70-16547411527242-166140658303417.png" alt="watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQ1NzM3MDY4,size_16,color_FFFFFF,t_70-16547411527242"></p>
+<h3 id="字符串常量池（String-pool-String-table）"><a href="#字符串常量池（String-pool-String-table）" class="headerlink" title="字符串常量池（String pool/String table）"></a>字符串常量池（String pool/String table）</h3><p>字符串常量池逻辑上是运行时常量池的子集，具体可见<a href="https://github.com/fenixsoft/jvm_book/issues/112">https://github.com/fenixsoft/jvm_book/issues/112</a></p>
+<p>字符串常量池又称为：字符串池，全局字符串池,英文也叫String Pool。 在工作中，String类是我们使用频率非常高的一种对象类型。JVM为了提升性能和减少内存开销，避免字符串的重复创建，其维护了一块特殊的内存空间：字符串常量池。<strong>字符串常量池由String类私有的维护</strong>。</p>
+<h3 id="常量池和字符串常量池的版本变化"><a href="#常量池和字符串常量池的版本变化" class="headerlink" title="常量池和字符串常量池的版本变化"></a>常量池和字符串常量池的版本变化</h3><ul>
+<li><p>在JDK1.7之前运行时常量池逻辑包含字符串常量池存放在方法区, 此时hotspot虚拟机对方法区的实现为永久代</p>
+</li>
+<li><p>在JDK1.7 字符串常量池、静态变量等被从方法区拿到了堆中, 这里没有提到运行时常量池,也就是说 字符串常量池被单独拿到堆,运行时常量池剩下的东西还在方法区, 也就是hotspot中的永久代</p>
+<blockquote>
+<p>字符串常量池本身并没有被移动，还是在native memory，移动的是String实例，也就是逻辑上移动到了堆</p>
+</blockquote>
+</li>
+<li><p>在JDK1.8 hotspot移除了永久代用元空间(Metaspace)取而代之, 这时候字符串常量池还在堆, 运行时常量池还在方法区, 只不过方法区的实现从永久代变成了元空间(Metaspace)</p>
+<blockquote>
+<p>字符串常量池（StringTable）在native memory，一般逻辑上认为在堆里面</p>
+</blockquote>
+</li>
+<li><p>JDK1.8-1.9,String底层从char数组变成了byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
+</li>
+<li><p>补充：</p>
+<ul>
+<li>对象只能存在于堆中（虚拟机规范的定义），所以String实体只能存在于堆中</li>
+<li>运行时常量池存放的是字面量引用</li>
+<li>使用双引号方式显式声明的字符串，则直接放入字符串常量池中（final修饰的“变量”可以直接看作双引号字面量）</li>
+</ul>
+</li>
+</ul>
+<p><strong>StringTable为什么要调整</strong>（1.6-1.7）</p>
+<ul>
+<li>permSize默认比较小</li>
+<li>永久代垃圾回收频率低</li>
+</ul>
+<p><strong>字符串拼接操作</strong></p>
+<ul>
+<li>常量与常量的拼接结果在常量池，原理是编译器优化</li>
+<li>常量池中不会存在相同内容的常量</li>
+<li>只要其中一个是变量，结果就在堆中。变量拼接的原理是StringBuilder（final不算变量），返回String对象</li>
+<li>如果拼接的结果调用intern()方法，则注定将常量池中还没有的字符串对象放入池中，并返回此对象地址</li>
+</ul>
+<p><strong>所以建议多使用final定义字符串,并且不使用new，对于new String()声明final不会优化</strong></p>
+<p>示例</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="type">boolean</span> <span class="title function_">IsInPool</span><span class="params">(String str)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> str == str.intern();</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">a1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>;</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">a2</span> <span class="operator">=</span> <span class="string">&quot;b&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a3</span> <span class="operator">=</span> a1 + a2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">limit1</span> <span class="operator">=</span> <span class="string">&quot;ab&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="type">String</span> <span class="variable">a4</span> <span class="operator">=</span> <span class="string">&quot;c&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a5</span> <span class="operator">=</span> <span class="string">&quot;d&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a6</span> <span class="operator">=</span> a4 + a5;</span><br><span class="line">    <span class="type">String</span> <span class="variable">limit2</span> <span class="operator">=</span> <span class="string">&quot;cd&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="type">String</span> <span class="variable">b1</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;e&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">b2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;f&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">b3</span> <span class="operator">=</span> b1 + b2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">limit3</span> <span class="operator">=</span> <span class="string">&quot;ef&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">b4</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;g&quot;</span>);</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">b5</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;h&quot;</span>);</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">b6</span> <span class="operator">=</span> b4 + b5;</span><br><span class="line">    <span class="keyword">final</span> <span class="type">String</span> <span class="variable">limit4</span> <span class="operator">=</span> <span class="string">&quot;gh&quot;</span>;</span><br><span class="line"></span><br><span class="line">    System.out.println(IsInPool(a3));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(a6));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(b3));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(b6));<span class="comment">//false</span></span><br></pre></td></tr></table></figure>
+
+<img src="image-20211008215003210.png" alt="image-20211008215003210" style="zoom:50%;">
+
+<h2 id="字符串的创建与常量池"><a href="#字符串的创建与常量池" class="headerlink" title="字符串的创建与常量池"></a><strong>字符串的创建与常量池</strong></h2><p><strong>String两种创建方式</strong></p>
+<ul>
+<li>方式一（str值和字符串常量池中字面量地址相等）</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> <span class="string">&quot;abc&quot;</span></span><br></pre></td></tr></table></figure>
+
+<ol>
+<li>检查字符串常量池是否存在该字符串，存在则不创建并且返回string对象的引用</li>
+<li>不存在则在堆中创建该字符串常量对应的string对象并将其引用存入字符串常量池中，然后返回该创建对象的引用</li>
+</ol>
+<ul>
+<li>方式二（str值和字符串常量池中字面量地址不相等）</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;abc&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li><p>检查字符串常量池是否存在该字符串，存在则不创建string对象,不存在则在堆中创建该字符串常量对应的string对象并将其引用存入字符串常量池中</p>
+<blockquote>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// hotspot/src/share/vm/classfile/symbolTable.cpp</span></span><br><span class="line"><span class="comment">// try to reuse the string if possible</span></span><br><span class="line"><span class="keyword">if</span> (!string_or_null.is_null()) &#123;</span><br><span class="line"> <span class="built_in">string</span> = string_or_null;</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line"> <span class="built_in">string</span> = java_lang_String::create_from_unicode(name, len, CHECK_NULL);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</blockquote>
+</li>
+<li><p>在堆中创建该对象，对象内部的char数组（实际的value）与常量池中创建的string对象共用一个char数组</p>
+</li>
+</ol>
+<p><strong>测试代码</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="type">String</span> <span class="variable">str1</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;abcd&quot;</span>);</span><br><span class="line"><span class="type">String</span> <span class="variable">str2</span> <span class="operator">=</span> <span class="string">&quot;abcd&quot;</span>;</span><br><span class="line"><span class="type">Field</span> <span class="variable">value</span> <span class="operator">=</span> str1.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">value.setAccessible(<span class="literal">true</span>);</span><br><span class="line">System.out.println(System.identityHashCode(str1));<span class="comment">//990368553</span></span><br><span class="line">System.out.println(System.identityHashCode(value.get(str1)));<span class="comment">//1096979270</span></span><br><span class="line">System.out.println(System.identityHashCode(value.get(str2)));<span class="comment">//1096979270</span></span><br><span class="line">System.out.println(System.identityHashCode(str2));<span class="comment">//1078694789</span></span><br><span class="line">System.out.println(System.identityHashCode(str1.intern()));<span class="comment">//1078694789</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>普遍地</strong></p>
+<p>使用双引号方式显式存在的字符串，则直接放入字符串常量池中（final修饰的“变量”可以直接看作双引号字面量）</p>
+<h3 id="一些测试（JDK1-8）"><a href="#一些测试（JDK1-8）" class="headerlink" title="一些测试（JDK1.8）"></a><strong>一些测试</strong>（JDK1.8）</h3><p>情况一：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;b&quot;</span>);</span><br><span class="line">        <span class="type">String</span> <span class="variable">a3</span> <span class="operator">=</span> <span class="string">&quot;c&quot;</span>;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a4</span> <span class="operator">=</span> a1 + a2;</span><br><span class="line">        <span class="type">String</span> <span class="variable">a5</span> <span class="operator">=</span> a1 + a3;</span><br><span class="line"><span class="comment">//        String at = &quot;a&quot;+&quot;c&quot;;</span></span><br><span class="line"><span class="comment">//        String at1 = &quot;a&quot;+&quot;b&quot;;</span></span><br><span class="line"></span><br><span class="line">        System.out.println(IsInPool(a1));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(<span class="string">&quot;b&quot;</span>));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(a2));<span class="comment">//false</span></span><br><span class="line">        System.out.println(IsInPool(a3));<span class="comment">//true</span></span><br><span class="line"></span><br><span class="line">        System.out.println(IsInPool(a4));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(<span class="string">&quot;ab&quot;</span>));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(a5));<span class="comment">//true</span></span><br><span class="line">        System.out.println(IsInPool(<span class="string">&quot;ac&quot;</span>));<span class="comment">//true</span></span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>情况二：</p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;b&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">a3</span> <span class="operator">=</span> <span class="string">&quot;c&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a4</span> <span class="operator">=</span> a1 + a2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">a5</span> <span class="operator">=</span> a1 + a3;</span><br><span class="line">    <span class="type">String</span> <span class="variable">at</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>+<span class="string">&quot;c&quot;</span>;</span><br><span class="line">    <span class="type">String</span> <span class="variable">at1</span> <span class="operator">=</span> <span class="string">&quot;a&quot;</span>+<span class="string">&quot;b&quot;</span>;</span><br><span class="line"></span><br><span class="line">    System.out.println(IsInPool(a1));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(<span class="string">&quot;b&quot;</span>));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(a2));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(a3));<span class="comment">//true</span></span><br><span class="line"></span><br><span class="line">    System.out.println(IsInPool(a4));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(<span class="string">&quot;ab&quot;</span>));<span class="comment">//true</span></span><br><span class="line">    System.out.println(IsInPool(a5));<span class="comment">//false</span></span><br><span class="line">    System.out.println(IsInPool(<span class="string">&quot;ac&quot;</span>));<span class="comment">//t</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>IsInpool函数</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line">   <span class="comment">//使用这个函数需要在这个函数前使用双引号字面量使得字符串直接被加入常量池中</span></span><br><span class="line"><span class="comment">//使用顺序应为待测字符串-&gt;字面量-&gt;IsInPool</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="type">boolean</span> <span class="title function_">IsInPool</span><span class="params">(String str)</span>&#123;</span><br><span class="line">       <span class="keyword">return</span> str == str.intern();</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="对于intern函数的理解"><a href="#对于intern函数的理解" class="headerlink" title="对于intern函数的理解"></a>对于intern函数的理解</h3><p>调用这个方法之后就是去看当前字符串是否在字符串常量池中已经存在引用</p>
+<p>（1）<strong>存 在</strong>：那就直接返回该字符串在字符串常量池中所对应的地址给栈中要引用这个字符串的变量。</p>
+<p>（2）<strong>不存在</strong>：<br>① jdk 1.6：先在字符串常量池中创建该字符串，地址与堆中字符串地址不相同（方法区）。然后再返回刚创建的字符串在字符串常量池中所对应的地址给栈中要引用这个字符串的变量。</p>
+<p>② jdk 1.7及以后：直接将堆中（不是字符串常量池中）该字符串的地址复制到字符串常量池中，这样字符串常量池就有了该字符串的地址引用，也可以说此时字符串常量池中的字符串只是一个对堆中字符串对象的引用，它们两个的地址相同，然后再把这个地址返回给栈中要引用这个字符串的变量。</p>
+<blockquote>
+<p>具体看下面源码解析，这里描述可能不太精确</p>
+</blockquote>
+<h3 id="对测试的解释"><a href="#对测试的解释" class="headerlink" title="对测试的解释"></a>对测试的解释</h3><ul>
+<li>第一次两个拼接测试为true，因为intern函数将堆中字符串对象引用复制到字符串常量池中，所以二者自然相等</li>
+<li>第二次两个拼接测试为false，因为intern检查到已经存在该字符常量，且堆常量池中保存的是字符串的值，二者自然不相等</li>
+</ul>
+<h3 id="对StringBuilder的优化"><a href="#对StringBuilder的优化" class="headerlink" title="对StringBuilder的优化"></a>对StringBuilder的优化</h3><p>对于StringBuilder.append,底层默认为长度为16的char型数组，超出长度则需要新建数组重新依次赋值</p>
+<p>如果明确知道长度不高于某个值，可以使用new StringBuilder(max)来初始化 </p>
+<h2 id="String的不可变性与强制修改"><a href="#String的不可变性与强制修改" class="headerlink" title="String的不可变性与强制修改"></a>String的不可变性与强制修改</h2><h3 id="String为什么不可变？"><a href="#String为什么不可变？" class="headerlink" title="String为什么不可变？"></a>String为什么不可变？</h3><ul>
+<li>因为String底层是private修饰的final类型的char数组</li>
+</ul>
+<blockquote>
+<p>Java9之后改用byte数组，原因是部分字符仅占一个byte，而堆中含有大量的String字符串，该优化能节省较多空间。</p>
+</blockquote>
+<ul>
+<li><p>value数组创建出来后本身长度不可变，final修饰后也不能修改为其他引用</p>
+</li>
+<li><p>并且String本身是final类，也就是不可被继承的</p>
+</li>
+</ul>
+<p><strong>以上都是不考虑反射的说法</strong></p>
+<h3 id="强制修改String"><a href="#强制修改String" class="headerlink" title="强制修改String"></a>强制修改String</h3><p><strong>通过反射可以修改String</strong></p>
+<p><strong>两块测试代码块应独立测试，因为第一部分代码块的isInPool会对常量池造成影响</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="type">boolean</span> <span class="title function_">isInPool</span><span class="params">(String str)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> str == str.intern();</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">    <span class="type">String</span> <span class="variable">s1</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;String  of &quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s2</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;test&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s</span> <span class="operator">=</span> s1 + s2;</span><br><span class="line">    <span class="type">String</span> <span class="variable">origin</span> <span class="operator">=</span> <span class="string">&quot;String  of test&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">//用于检测常量池字面量是否被修改</span></span><br><span class="line">    <span class="comment">//如果被修改，那么intern返回的应该是常量池中地址，跟对象地址应该不一样</span></span><br><span class="line">    <span class="type">String</span> <span class="variable">s3</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;Reflect of &quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s4</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">String</span>(<span class="string">&quot;test&quot;</span>);</span><br><span class="line">    <span class="type">String</span> <span class="variable">s5</span> <span class="operator">=</span> s3 + s4;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Influential---修改常量池中对象</span></span><br><span class="line"><span class="comment">     * 如果修改了，那么等下检测时str == str.intern()肯定会是true，</span></span><br><span class="line"><span class="comment">     * 因为常量池中不存在修改后的字面量，所以intern返回的是对象本身</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    System.out.println(<span class="string">&quot;修改堆对象&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前地址:&quot;</span>+System.identityHashCode(s));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前值:&quot;</span>+s);</span><br><span class="line">    <span class="type">Field</span> <span class="variable">value</span> <span class="operator">=</span> s.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">    value.setAccessible(<span class="literal">true</span>);</span><br><span class="line">    <span class="type">char</span>[] o = (<span class="type">char</span>[]) value.get(s);</span><br><span class="line">    System.out.println(<span class="string">&quot;反射数据地址:&quot;</span>+System.identityHashCode(o));</span><br><span class="line">    o[<span class="number">0</span>] = <span class="string">&#x27;R&#x27;</span>;</span><br><span class="line">    o[<span class="number">1</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o[<span class="number">2</span>] = <span class="string">&#x27;f&#x27;</span>;</span><br><span class="line">    o[<span class="number">3</span>] = <span class="string">&#x27;l&#x27;</span>;</span><br><span class="line">    o[<span class="number">4</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o[<span class="number">5</span>] = <span class="string">&#x27;c&#x27;</span>;</span><br><span class="line">    o[<span class="number">6</span>] = <span class="string">&#x27;t&#x27;</span>;</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后地址:&quot;</span>+System.identityHashCode(s));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后值:&quot;</span>+s);</span><br><span class="line">    System.out.println(isInPool(s));<span class="comment">//true</span></span><br><span class="line">    System.out.println(<span class="string">&quot;地址:&quot;</span>+System.identityHashCode(s));</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Influential---修改String对象</span></span><br><span class="line"><span class="comment">     * 如果修改了常量池中String字面量，那么等下检测时str == str.intern()应该要是false，</span></span><br><span class="line"><span class="comment">     * 因为常量池按理已经存在了修改后的字面量，所以intern返回的常量池中地址</span></span><br><span class="line"><span class="comment">     * 那么为什么会是true？</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    System.out.println(<span class="string">&quot;===============分割线===============&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;下面是修改常量池&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前地址:&quot;</span>+System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前值:&quot;</span>+origin);</span><br><span class="line">    <span class="type">Field</span> <span class="variable">value2</span> <span class="operator">=</span> origin.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">    value2.setAccessible(<span class="literal">true</span>);</span><br><span class="line">    <span class="type">char</span>[] o2 = (<span class="type">char</span>[]) value2.get(origin);</span><br><span class="line">    System.out.println(<span class="string">&quot;反射数据地址:&quot;</span>+System.identityHashCode(o2));</span><br><span class="line">    o2[<span class="number">0</span>] = <span class="string">&#x27;R&#x27;</span>;</span><br><span class="line">    o2[<span class="number">1</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">2</span>] = <span class="string">&#x27;f&#x27;</span>;</span><br><span class="line">    o2[<span class="number">3</span>] = <span class="string">&#x27;l&#x27;</span>;</span><br><span class="line">    o2[<span class="number">4</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">5</span>] = <span class="string">&#x27;c&#x27;</span>;</span><br><span class="line">    o2[<span class="number">6</span>] = <span class="string">&#x27;t&#x27;</span>;</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后地址:&quot;</span>+System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后值:&quot;</span>+origin);</span><br><span class="line"></span><br><span class="line">    System.out.println(isInPool(s5));<span class="comment">//true</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>对于上面第二部分代码的解释</strong></p>
+<figure class="highlight java"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">    <span class="type">String</span> <span class="variable">origin</span> <span class="operator">=</span> <span class="string">&quot;String  of test&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">//用于检测常量池字面量是否被修改</span></span><br><span class="line">    <span class="comment">//如果被修改，那么intern返回的应该是常量池中地址，跟对象地址应该不一样</span></span><br><span class="line">    <span class="type">String</span> <span class="variable">s3</span> <span class="operator">=</span><span class="string">&quot;Reflect of test&quot;</span>;</span><br><span class="line">    System.out.println(System.identityHashCode(s3));<span class="comment">//true</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Influential---修改String对象</span></span><br><span class="line"><span class="comment">     * 如果修改了常量池中String字面量，那么等下检测时str == str.intern()应该要是false，</span></span><br><span class="line"><span class="comment">     * 因为常量池按理已经存在了修改后的字面量，所以intern返回的常量池中地址</span></span><br><span class="line"><span class="comment">     * 那么为什么会是true？</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    System.out.println(<span class="string">&quot;===============分割线===============&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;下面是修改常量池&quot;</span>);</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前地址:&quot;</span> + System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改前值:&quot;</span> + origin);</span><br><span class="line">    <span class="type">Field</span> <span class="variable">value2</span> <span class="operator">=</span> origin.getClass().getDeclaredField(<span class="string">&quot;value&quot;</span>);</span><br><span class="line">    value2.setAccessible(<span class="literal">true</span>);</span><br><span class="line">    <span class="type">char</span>[] o2 = (<span class="type">char</span>[]) value2.get(origin);</span><br><span class="line">    System.out.println(<span class="string">&quot;反射数据地址:&quot;</span> + System.identityHashCode(o2));</span><br><span class="line">    o2[<span class="number">0</span>] = <span class="string">&#x27;R&#x27;</span>;</span><br><span class="line">    o2[<span class="number">1</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">2</span>] = <span class="string">&#x27;f&#x27;</span>;</span><br><span class="line">    o2[<span class="number">3</span>] = <span class="string">&#x27;l&#x27;</span>;</span><br><span class="line">    o2[<span class="number">4</span>] = <span class="string">&#x27;e&#x27;</span>;</span><br><span class="line">    o2[<span class="number">5</span>] = <span class="string">&#x27;c&#x27;</span>;</span><br><span class="line">    o2[<span class="number">6</span>] = <span class="string">&#x27;t&#x27;</span>;</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后地址:&quot;</span> + System.identityHashCode(origin));</span><br><span class="line">    System.out.println(<span class="string">&quot;修改后值:&quot;</span> + origin);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//此时S3&quot;Reflect of test&quot;</span></span><br><span class="line">    <span class="comment">//origin为&quot;Reflect of test&quot;</span></span><br><span class="line">    System.out.println(<span class="string">&quot;修改前常量池的string of reflect地址&quot;</span>+System.identityHashCode(s3));<span class="comment">//true</span></span><br><span class="line">    System.out.println(<span class="string">&quot;修改string of test产生的string of reflect地址&quot;</span>+System.identityHashCode(origin));<span class="comment">//true</span></span><br><span class="line">    String ss=<span class="string">&quot;Reflect of test&quot;</span>;</span><br><span class="line">    System.out.println(System.identityHashCode(ss));</span><br><span class="line"></span><br><span class="line">    String sss=<span class="string">&quot;String  of test&quot;</span>;</span><br><span class="line">    System.out.println(System.identityHashCode(sss));</span><br><span class="line">    System.out.println(origin);</span><br><span class="line">    System.out.println(sss);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码会导致最后声明的sss输出结果变成Reflect of test</p>
+<p><img src="image-20220410235820491-166140589670210.png" alt="image-20220410235820491"></p>
+<p><strong>原因是：</strong></p>
+<p>字符串常量池底层其实是个hash表，这也很好地解释了字符串常量池检查重复的机制，查重能达到O(1)的复杂度。</p>
+<p>将一个字符串值存入常量池时，会在将hash值，字符串数组作为kv存入查重的hash表中。</p>
+<blockquote>
+<p>引用对象实体内容修改以后hash表里面字面量还是没变。</p>
+</blockquote>
+<p>上面这句话是错误的解释，常量的操作主要是三种</p>
+<ul>
+<li>一方面是编译时会优化</li>
+<li>一方面显示声明会自动加常量池</li>
+<li>一方面即时编译器也会优化</li>
+</ul>
+<p>实际上图中的问题是编译期间将多个常量只创建了一份，也就是通过的是class常量池，并非通过字符串常量池去重。</p>
+<p>不过通过字面量显示声明的常量创建还是会走常量池的（无论是第一次创建还是后续重复创建）。</p>
+<p>测试的时候可以通过将常量分别在多个类中编写来避免这种编译期间的去重（并且使用-Xint指定节解释执行）。</p>
+<p>SymbolTable底层是基于hashtable实现的，结构是数组+链表，当存储的数据足够多，遇到hash碰撞严重时（Hotspot触发rehash的条件是：查找一个字符串超过100次），是通过切换hash算法实现的。</p>
+<h2 id="intern源码研究-JDK8"><a href="#intern源码研究-JDK8" class="headerlink" title="intern源码研究(JDK8)"></a>intern源码研究(JDK8)</h2><p><a href="https://blog.csdn.net/qq_19648191/article/details/117358082">https://blog.csdn.net/qq_19648191/article/details/117358082</a></p>
+<p><a href="https://www.freesion.com/article/61901174982/">https://www.freesion.com/article/61901174982/</a></p>
+<p><a href="https://blog.csdn.net/qq_33678688/article/details/89091930">https://blog.csdn.net/qq_33678688/article/details/89091930</a></p>
+<p><a href="https://zhuanlan.zhihu.com/p/28973077">https://zhuanlan.zhihu.com/p/28973077</a></p>
+<ol>
+<li><p><code>hotspot/src/share/vm/prims/jvm.cpp</code></p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// String support ///////////////////////////////////////////////////////////////////////////</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">JVM_ENTRY</span>(jstring, <span class="built_in">JVM_InternString</span>(JNIEnv *env, jstring str))</span><br><span class="line">  <span class="built_in">JVMWrapper</span>(<span class="string">&quot;JVM_InternString&quot;</span>);</span><br><span class="line">  JvmtiVMObjectAllocEventCollector oam;</span><br><span class="line">  <span class="keyword">if</span> (str == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  oop string = JNIHandles::<span class="built_in">resolve_non_null</span>(str);</span><br><span class="line">  oop result = StringTable::<span class="built_in">intern</span>(string, CHECK_NULL);</span><br><span class="line">  <span class="keyword">return</span> (jstring) JNIHandles::<span class="built_in">make_local</span>(env, result);</span><br><span class="line">JVM_END</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">oop <span class="title">StringTable::intern</span><span class="params">(oop string, TRAPS)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (string == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  <span class="function">ResourceMark <span class="title">rm</span><span class="params">(THREAD)</span></span>;</span><br><span class="line">  <span class="type">int</span> length;</span><br><span class="line">  <span class="comment">// 创建string的句柄</span></span><br><span class="line">  <span class="function">Handle <span class="title">h_string</span> <span class="params">(THREAD, string)</span></span>;</span><br><span class="line">  <span class="comment">// 转换成Unicode编码的玩意，这里似乎是重新开空间创建一个Unicode的字符串</span></span><br><span class="line">  <span class="comment">// 但是在后面这个Unicode字符串只用于计算哈希值和查找比对，除非下一个intern方法中发现句柄没有创建才会用到这个Unicode来创建句柄</span></span><br><span class="line">  jchar* chars = java_lang_String::<span class="built_in">as_unicode_string</span>(string, length,</span><br><span class="line">                                                     CHECK_NULL);</span><br><span class="line">  <span class="comment">// 调用最终的intern</span></span><br><span class="line">  oop result = <span class="built_in">intern</span>(h_string, chars, length, CHECK_NULL);</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// string是个handle，chars是转成了unicode的原字符串</span></span><br><span class="line"><span class="function">oop <span class="title">StringTable::intern</span><span class="params">(Handle string_or_null, jchar* name,</span></span></span><br><span class="line"><span class="params"><span class="function">                        <span class="type">int</span> len, TRAPS)</span> </span>&#123; y</span><br><span class="line">  <span class="type">unsigned</span> <span class="type">int</span> hashValue = <span class="built_in">hash_string</span>(name, len);</span><br><span class="line">  <span class="type">int</span> index = <span class="built_in">the_table</span>()-&gt;<span class="built_in">hash_to_index</span>(hashValue);</span><br><span class="line">  oop found_string = <span class="built_in">the_table</span>()-&gt;<span class="built_in">lookup</span>(index, name, len, hashValue);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Found</span></span><br><span class="line">  <span class="keyword">if</span> (found_string != <span class="literal">NULL</span>) <span class="keyword">return</span> found_string;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">debug_only</span>(StableMemoryChecker <span class="built_in">smc</span>(name, len * <span class="built_in">sizeof</span>(name[<span class="number">0</span>])));</span><br><span class="line">  <span class="built_in">assert</span>(!Universe::<span class="built_in">heap</span>()-&gt;<span class="built_in">is_in_reserved</span>(name),</span><br><span class="line">         <span class="string">&quot;proposed name of symbol must be stable&quot;</span>);</span><br><span class="line"></span><br><span class="line">  Handle string;</span><br><span class="line">  <span class="comment">// try to reuse the string if possible</span></span><br><span class="line">  <span class="comment">// 如果这个句柄已经创建好了能直接用那就直接用</span></span><br><span class="line">  <span class="keyword">if</span> (!string_or_null.<span class="built_in">is_null</span>()) &#123;</span><br><span class="line">    string = string_or_null;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// 如果句柄没有创建好那就从转为Unicode编码后的这个字符串创建一个句柄</span></span><br><span class="line">    <span class="comment">// 目前看来似乎是编译期间使用双引号创建字面量会走这个逻辑，字符串常量池会直接创建一个string</span></span><br><span class="line">    string = java_lang_String::<span class="built_in">create_from_unicode</span>(name, len, CHECK_NULL);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Grab the StringTable_lock before getting the_table() because it could</span></span><br><span class="line">  <span class="comment">// change at safepoint.</span></span><br><span class="line">  <span class="function">MutexLocker <span class="title">ml</span><span class="params">(StringTable_lock, THREAD)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Otherwise, add to symbol to table</span></span><br><span class="line">  <span class="comment">// 向stringtable里面添加句柄</span></span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">the_table</span>()-&gt;<span class="built_in">basic_add</span>(index, string, name, len,</span><br><span class="line">                                hashValue, CHECK_NULL);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function">oop <span class="title">StringTable::basic_add</span><span class="params">(<span class="type">int</span> index_arg, Handle string, jchar* name,</span></span></span><br><span class="line"><span class="params"><span class="function">                           <span class="type">int</span> len, <span class="type">unsigned</span> <span class="type">int</span> hashValue_arg, TRAPS)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">assert</span>(java_lang_String::<span class="built_in">equals</span>(<span class="built_in">string</span>(), name, len),</span><br><span class="line">         <span class="string">&quot;string must be properly initialized&quot;</span>);</span><br><span class="line">  <span class="comment">// Cannot hit a safepoint in this function because the &quot;this&quot; pointer can move.</span></span><br><span class="line">  No_Safepoint_Verifier nsv;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Check if the symbol table has been rehashed, if so, need to recalculate</span></span><br><span class="line">  <span class="comment">// the hash value and index before second lookup.</span></span><br><span class="line">  <span class="type">unsigned</span> <span class="type">int</span> hashValue;</span><br><span class="line">  <span class="type">int</span> index;</span><br><span class="line">  <span class="keyword">if</span> (<span class="built_in">use_alternate_hashcode</span>()) &#123;</span><br><span class="line">    hashValue = <span class="built_in">hash_string</span>(name, len);</span><br><span class="line">    index = <span class="built_in">hash_to_index</span>(hashValue);</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    hashValue = hashValue_arg;</span><br><span class="line">    index = index_arg;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Since look-up was done lock-free, we need to check if another</span></span><br><span class="line">  <span class="comment">// thread beat us in the race to insert the symbol.</span></span><br><span class="line">  <span class="comment">// 如果已经有了就不用添加了并且可以直接返回</span></span><br><span class="line">  oop test = <span class="built_in">lookup</span>(index, name, len, hashValue); <span class="comment">// calls lookup(u1*, int)</span></span><br><span class="line">  <span class="keyword">if</span> (test != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="comment">// Entry already added</span></span><br><span class="line">    <span class="keyword">return</span> test;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// HashtableEntry 里面保存hash值以及这个字符串的引用（_literal），有了引用就可以得到字符串的字面量和地址了</span></span><br><span class="line">  HashtableEntry&lt;oop, mtSymbol&gt;* entry = <span class="built_in">new_entry</span>(hashValue, <span class="built_in">string</span>());</span><br><span class="line">  <span class="built_in">add_entry</span>(index, entry);</span><br><span class="line">  <span class="keyword">return</span> <span class="built_in">string</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h2 id="补充"><a href="#补充" class="headerlink" title="补充"></a><strong>补充</strong></h2><p><strong>关于内存分配位置</strong></p>
+<ol>
+<li><p><code>hotspot/src/share/vm/runtime/handles.inline.hpp</code></p>
+<p>句柄的创建用的是线程本地内存，也就是堆空间</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">inline</span> <span class="title function_">Handle::Handle</span><span class="params">(Thread* thread, oop obj)</span> &#123;</span><br><span class="line">  assert(thread == Thread::current(), <span class="string">&quot;sanity check&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span> (obj == <span class="literal">NULL</span>) &#123;</span><br><span class="line">    _handle = <span class="literal">NULL</span>;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    _handle = thread-&gt;handle_area()-&gt;allocate_handle(obj);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><code>hotspot/src/share/vm/classfile/symbolTable.cpp</code></p>
+<p>Unicode字符串的创建也是用的堆空间</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">jchar* <span class="title function_">java_lang_String::as_unicode_string</span><span class="params">(oop java_string, <span class="type">int</span>&amp; length, TRAPS)</span> &#123;</span><br><span class="line">  typeArrayOop value  = java_lang_String::value(java_string);</span><br><span class="line">  <span class="type">int</span>          offset = java_lang_String::offset(java_string);</span><br><span class="line">               length = java_lang_String::length(java_string);</span><br><span class="line"></span><br><span class="line">  jchar* result = NEW_RESOURCE_ARRAY_RETURN_NULL(jchar, length);</span><br><span class="line">  <span class="keyword">if</span> (result != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> index = <span class="number">0</span>; index &lt; length; index++) &#123;</span><br><span class="line">      result[index] = value-&gt;char_at(index + offset);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    THROW_MSG_0(vmSymbols::java_lang_OutOfMemoryError(), <span class="string">&quot;could not allocate Unicode string&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// hotspot/src/share/vm/memory/allocation.hpp</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> NEW_RESOURCE_ARRAY_RETURN_NULL(type, size)\</span></span><br><span class="line"><span class="meta">  (type*) resource_allocate_bytes((size) * sizeof(type), AllocFailStrategy::RETURN_NULL)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// hotspot/src/share/vm/memory/resourceArea.cpp</span></span><br><span class="line"><span class="comment">// Allocation in thread-local resource area</span></span><br><span class="line"><span class="keyword">extern</span> <span class="type">char</span>* <span class="title function_">resource_allocate_bytes</span><span class="params">(<span class="type">size_t</span> size, AllocFailType alloc_failmode)</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> Thread::current()-&gt;resource_area()-&gt;allocate_bytes(size, alloc_failmode);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>StringTable的创建实际上是在nativememory</p>
+<ol>
+<li><p><a href="https://docs.oracle.com/javase/8/docs/technotes/guides/vm/enhancements-7.html">https://docs.oracle.com/javase/8/docs/technotes/guides/vm/enhancements-7.html</a></p>
+<p>官方文档说明说的是将interned strings移到堆内存中，而非StringTable</p>
+<blockquote>
+<p><strong>Area</strong>: HotSpot<br><strong>Standard/Platform</strong>: JDK 7<br><strong>Synopsis</strong>: In JDK 7, interned strings are no longer allocated in the permanent generation of the Java heap, but are instead allocated in the main part of the Java heap (known as the young and old generations), along with the other objects created by the application. This change will result in more data residing in the main Java heap, and lessw data in the permanent generation, and thus may require heap sizes to be adjusted. Most applications will see only relatively small differences in heap usage due to this change, but larger applications that load many classes or make heavy use of the <code>String.intern()</code> method will see more significant differences.<br><strong>RFE</strong>: <a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6962931">6962931</a></p>
+</blockquote>
+</li>
+<li><p>深入理解Java虚拟机中<code>3.2.2 可达性分析算法</code>写到</p>
+<blockquote>
+<p>在Java技术体系里面，固定可作为GC Roots的对象包括以下几种： </p>
+<p>·在虚拟机栈（栈帧中的本地变量表）中引用的对象，譬如各个线程被调用的方法堆栈中使用到的 参数、局部变量、临时变量等。 </p>
+<p>·在方法区中类静态属性引用的对象，譬如Java类的引用类型静态变量。 </p>
+<p>·<strong>在方法区中常量引用的对象，譬如字符串常量池（String Table）里的引用</strong></p>
+</blockquote>
+</li>
+<li><p>R大说的</p>
+<blockquote>
+<p>常量池”如果说的是SymbolTable / StringTable，这俩table自身原本就一直在native memory里，是它们所引用的东西在哪里更有意思。上面说了，java7是把SymbolTable引用的Symbol移动到了native memory，而StringTable引用的java.lang.String实例则从PermGen移动到了普通Java heap。</p>
+</blockquote>
+</li>
+<li><p>StringTable的创建源码</p>
+<p>hotspot/src/share/vm/memory/universe.cpp</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">jint <span class="title function_">universe_init</span><span class="params">()</span> &#123;</span><br><span class="line">	</span><br><span class="line">  ......</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (UseSharedSpaces) &#123;</span><br><span class="line">    <span class="comment">// Read the data structures supporting the shared spaces (shared</span></span><br><span class="line">    <span class="comment">// system dictionary, symbol table, etc.).  After that, access to</span></span><br><span class="line">    <span class="comment">// the file (other than the mapped regions) is no longer needed, and</span></span><br><span class="line">    <span class="comment">// the file is closed. Closing the file does not affect the</span></span><br><span class="line">    <span class="comment">// currently mapped regions.</span></span><br><span class="line">    MetaspaceShared::initialize_shared_spaces();</span><br><span class="line">    StringTable::create_table();</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    SymbolTable::create_table();</span><br><span class="line">    StringTable::create_table();</span><br><span class="line">    ClassLoader::create_package_info_table();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>调用链（jdk12）</p>
+<p><img src="image-20220720175742728-16614058967029.png" alt="image-20220720175742728"></p>
+<p>最终创建一个CHeap对象，不在 Java 的几个托管内存里，其实也就是native memory</p>
+</li>
+</ol>
+</li>
+</ol>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>总的来说，字符串常量池一直在nativememory中</p>
+<p>而JDK1.7之后interned strings被移动到了堆内存中，而StringTable保存的是字符串的hashvalue以及字符串本身</p>
+<p>另外，SymbolTable也在native memory中，至于SymbolTable的作用见<a href="https://hllvm-group.iteye.com/group/topic/26412#post-187861">https://hllvm-group.iteye.com/group/topic/26412#post-187861</a></p>
+<blockquote>
+<p>这些Utf8常量在HotSpot VM里以symbolOopDesc对象（下面简称symbol对象）来表现；它们可以通过一个全局的SymbolTable对象找到。注意：constantPool对象并不“包含”这些symbol对象，而只是引用着它们而已；或者说，constantPool对象只存了对symbol对象的引用，而没有存它们的内容。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/29352626/answer/44050736">https://www.zhihu.com/question/29352626/answer/44050736</a></p>
+<blockquote>
+<p>Symbol内嵌的存储不是char数组。如果要CONSTANT_String（String）引用了CONSTANT_Utf8（Symbol），那么ldc在初始化这个String对象的时候会从Symbol那边读取内容并创建对应的char[]以及String对象。</p>
+</blockquote>
+<blockquote>
+<p>Symbols在JDK7和JDK8里都在native memory里，但不在Metaspace里。<br>Symbols在native memory里通过引用计数管理，同时有个全局的SymbolTable管理着所有Symbol。</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>JVM</category>
+      </categories>
+      <tags>
+        <tag>JVM</tag>
+        <tag>常量池</tag>
+        <tag>HotSpot</tag>
       </tags>
   </entry>
 </search>
