@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"github.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="注意：预览功能非必要不建议使用。 这篇是对 JDK8 到 JDK21 之间一些特性的整理。下面的表格去除了大部分日常开发不需要感知的特性，并且按照我个人理解，根据重要性、影响程度、日常开发需要关注的程度做了排序，会比较主观。 完整列表还是建议看官方：  JEP Index JEPs in JDK 17 integrated since JDK 11 JEPs in JDK 21 integrate">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JDK21 特性取舍：哪些值得生产关注，哪些暂缓">
+<meta property="og:url" content="https://github.com/WtMonster/WtMonster.github.io.git/2026/05/02/02-jdk21-feature-selection/index.html">
+<meta property="og:site_name" content="大水怪">
+<meta property="og:description" content="注意：预览功能非必要不建议使用。 这篇是对 JDK8 到 JDK21 之间一些特性的整理。下面的表格去除了大部分日常开发不需要感知的特性，并且按照我个人理解，根据重要性、影响程度、日常开发需要关注的程度做了排序，会比较主观。 完整列表还是建议看官方：  JEP Index JEPs in JDK 17 integrated since JDK 11 JEPs in JDK 21 integrate">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2026-05-01T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-05-03T07:39:33.105Z">
+<meta property="article:author" content="WtMonster">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="JDK21">
+<meta property="article:tag" content="JVM">
+<meta property="article:tag" content="JEP">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://github.com/WtMonster/WtMonster.github.io.git/2026/05/02/02-jdk21-feature-selection/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>JDK21 特性取舍：哪些值得生产关注，哪些暂缓 | 大水怪</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="大水怪" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">大水怪</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">一只专注技术的水怪</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+  <a href="https://github.com/WtMonster/WtMonster.github.io.git" class="github-corner" title="WtMonster GitHub" aria-label="WtMonster GitHub"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://github.com/WtMonster/WtMonster.github.io.git/2026/05/02/02-jdk21-feature-selection/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="WtMonster">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="大水怪">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JDK21 特性取舍：哪些值得生产关注，哪些暂缓
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2026-05-02 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-02T00:00:00+08:00">2026-05-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2026-05-03 15:39:33" itemprop="dateModified" datetime="2026-05-03T15:39:33+08:00">2026-05-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>注意：预览功能非必要不建议使用。</p>
+<p>这篇是对 JDK8 到 JDK21 之间一些特性的整理。下面的表格去除了大部分日常开发不需要感知的特性，并且按照我个人理解，根据重要性、影响程度、日常开发需要关注的程度做了排序，会比较主观。</p>
+<p>完整列表还是建议看官方：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/0">JEP Index</a></li>
+<li><a target="_blank" rel="noopener" href="https://openjdk.org/projects/jdk/17/jeps-since-jdk-11">JEPs in JDK 17 integrated since JDK 11</a></li>
+<li><a target="_blank" rel="noopener" href="https://openjdk.org/projects/jdk/21/jeps-since-jdk-17">JEPs in JDK 21 integrated since JDK 17</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/21/migrate/significant-changes-jdk-release.html">Oracle JDK 21 migration guide</a></li>
+</ul>
+<h2 id="1-语言和日常开发相关"><a href="#1-语言和日常开发相关" class="headerlink" title="1. 语言和日常开发相关"></a>1. 语言和日常开发相关</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/395">JEP 395: Records</a></td>
+<td>16</td>
+<td>充当不可变数据的载体，与元组形式类似，类结构很简单。DTO、事件对象、配置快照都比较适合。有一些序列化相关特性需要注意。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/394">JEP 394</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/440">JEP 440</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/441">JEP 441</a></td>
+<td>14 / 16 / 21 / 21</td>
+<td>对 switch 表达式、instanceof 类型转换、Record 模式匹配都做了简化。这个对代码可读性提升比较明显，但别把复杂业务全塞到一个 switch 里。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a></td>
+<td>10</td>
+<td><code>var</code> 可以用，但我建议只在上下文中能直接看出类型，或者具体类型不重要时使用。比如 Stream 里某些很长的泛型类型。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a></td>
+<td>15</td>
+<td>多行字符串，写 SQL、JSON、测试数据会舒服很多。动态 SQL 还是别靠字符串拼接。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a></td>
+<td>17</td>
+<td>密封类，可以限制哪些类或接口能继承/实现它。和 pattern matching 配合起来会比较自然。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a></td>
+<td>21</td>
+<td>提供了一套“有序集合”的标准接口。这个不是大特性，但补上了集合框架里长期不太顺手的一块。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/430">JEP 430: String Templates (Preview)</a></td>
+<td>21</td>
+<td>字符串模板这个方向很有意思，但在 JDK21 里是 Preview，后来也有重做方向。我不建议生产主链路开启。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/443">JEP 443: Unnamed Patterns and Variables (Preview)</a></td>
+<td>21</td>
+<td>未使用变量可以用 <code>_</code> 表示。语义上是好事，但 JDK21 中仍是 Preview。</td>
+</tr>
+</tbody></table>
+<p>上面这些里面，我认为 Records、Text Blocks、switch/pattern matching、Sequenced Collections 是可以逐步进入日常编码习惯的。Preview 功能可以学习，不建议作为生产代码的基础。</p>
+<h2 id="2-JVM-和-Compiler-相关"><a href="#2-JVM-和-Compiler-相关" class="headerlink" title="2. JVM 和 Compiler 相关"></a>2. JVM 和 Compiler 相关</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/377">ZGC</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/379">Shenandoah</a></td>
+<td>15</td>
+<td>ZGC 和 Shenandoah 发布生产版本。真正对 JDK21 升级有吸引力的是后面的分代 ZGC。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a></td>
+<td>21</td>
+<td>ZGC 支持分代了，提升很大。适合 GC 延迟敏感应用重点验证，但仍然要看吞吐、CPU、RSS。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/328">JEP 328: Flight Recorder</a></td>
+<td>11</td>
+<td>绝对的神器。JDK 升级、GC 选型、虚拟线程灰度都应该用 JFR 看证据。后面会单独写 JFR 实战。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/307">JEP 307: Parallel Full GC for G1</a></td>
+<td>10</td>
+<td>G1 的 Full GC 支持并行后，极端情况下的暂停问题会比以前好一些。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/158">JEP 158</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/271">JEP 271</a></td>
+<td>9</td>
+<td>统一 JVM 日志和统一 GC 日志。升级时旧 GC 日志参数要迁移到 <code>-Xlog</code>。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/345">JEP 345: NUMA-Aware Memory Allocation for G1</a></td>
+<td>14</td>
+<td>NUMA 场景下有意义，普通开发不一定直接感知。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/280">JEP 280: Indify String Concatenation</a></td>
+<td>9</td>
+<td>字符串拼接底层改成 invokedynamic。业务一般不用管，但说明高版本 JDK 在底层持续优化。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/312">JEP 312: Thread-Local Handshakes</a></td>
+<td>10</td>
+<td>某些 VM 操作不再总是需要全局安全点，对停顿控制有帮助。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/451">JEP 451: Prepare to Disallow the Dynamic Loading of Agents</a></td>
+<td>21</td>
+<td>未来会限制运行时动态加载 agent。监控、诊断、热修复相关工具都要提前验证。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/416">JEP 416: Reimplement Core Reflection with Method Handles</a></td>
+<td>18</td>
+<td>用 MethodHandles 重新实现反射。主要目的是规范化，部分场景变快，部分场景变慢，需要靠压测和 JFR 看。</td>
+</tr>
+</tbody></table>
+<p>这部分才是升级 JDK 时更应该关注的地方。语言特性只是表面，运行时行为变化才决定上线风险。</p>
+<h2 id="3-Loom、Panama-和其他能力"><a href="#3-Loom、Panama-和其他能力" class="headerlink" title="3. Loom、Panama 和其他能力"></a>3. Loom、Panama 和其他能力</h2><table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>我的理解</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a></td>
+<td>21</td>
+<td>虚拟线程是 JDK21 最有吸引力的特性之一。IO 密集型服务值得重点看，但 JDK21 的 pinning 风险不能忽略。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/446">JEP 446: Scoped Values (Preview)</a></td>
+<td>21</td>
+<td>能在一些场景替代 ThreadLocal，但注意，它不是为了完全取代 ThreadLocal，也取代不了所有用法。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/453">JEP 453: Structured Concurrency (Preview)</a></td>
+<td>21</td>
+<td>提供任务组的结构化组织方式，和虚拟线程适配很好。JDK21 里还是 Preview，生产主链路谨慎。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/412">JEP 412: Foreign Function &amp; Memory API</a></td>
+<td>17</td>
+<td>Panama 对 JDK 的影响可能比 Loom 更底层，只是对上层业务开发没有那么直接。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/448">JEP 448: Vector API (Incubator)</a></td>
+<td>21</td>
+<td>SIMD 向量化。对 JSON 解析、压缩、数值计算这类基础库更有价值，普通业务不一定直接用。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/349">JEP 349: JFR Event Streaming</a></td>
+<td>14</td>
+<td>JFR 事件流，可以实现持续线上监控。虚拟线程 pinning 监控就很适合用它做。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/259">JEP 259: Stack-Walking API</a></td>
+<td>9</td>
+<td>比 <code>getStackTrace</code> 更灵活，可以按需处理 StackFrame。诊断工具和框架比较有用。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/250">JEP 250</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/310">JEP 310</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/341">JEP 341</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/350">JEP 350</a></td>
+<td>9 / 10 / 12 / 13</td>
+<td>CDS/AppCDS，可以改善启动和类加载成本，但要提前构建归档，工程化成本要考虑。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/193">JEP 193: Variable Handles</a></td>
+<td>9</td>
+<td>更细粒度的内存屏障控制，很多高性能库会用。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/254">JEP 254: Compact Strings</a></td>
+<td>9</td>
+<td>String 底层从 char 变成 byte，内存占用可能减少，但特定场景可能增加 CPU 开销。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/285">JEP 285: Spin-Wait Hints</a></td>
+<td>9</td>
+<td>自旋场景可以用 <code>Thread.onSpinWait()</code> 给 CPU 提示，不过要理解它不是业务性能银弹。</td>
+</tr>
+</tbody></table>
+<p>这里面我最关注的是 Virtual Threads、JFR Event Streaming 和 CDS。Panama/Vector API 很重要，但更偏底层库和基础设施。</p>
+<h2 id="4-废弃和删除"><a href="#4-废弃和删除" class="headerlink" title="4. 废弃和删除"></a>4. 废弃和删除</h2><p>升级时经常不是新特性出问题，而是老东西不见了。</p>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>JDK Version</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/374">JEP 374: Deprecate and Disable Biased Locking</a></td>
+<td>15</td>
+<td>偏向锁被废弃并默认关闭。大部分应用不用管，但老参数要清理。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/363">JEP 363: Remove the Concurrent Mark Sweep (CMS) Garbage Collector</a></td>
+<td>14</td>
+<td>CMS 移除了。还在用 CMS 参数的服务会直接启动失败。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/366">JEP 366: Deprecate the ParallelScavenge + SerialOld GC Combination</a></td>
+<td>14</td>
+<td>一些旧 GC 组合不再推荐。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/410">JEP 410: Remove the Experimental AOT and JIT Compiler</a></td>
+<td>17</td>
+<td>移除了实验性质的 AOT 和 Graal JIT。需要 AOT/JIT 相关能力的直接看 GraalVM 或后续 Leyden。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/214">JEP 214: Remove GC Combinations Deprecated in JDK 8</a></td>
+<td>9</td>
+<td>一些 JDK8 已废弃的 GC 组合被删除。</td>
+</tr>
+</tbody></table>
+<p>这部分建议在升级前直接扫启动参数。很多服务的 JVM 参数是历史遗留，没人确定它现在是否还有意义。</p>
+<h2 id="5-模块化和兼容"><a href="#5-模块化和兼容" class="headerlink" title="5. 模块化和兼容"></a>5. 模块化和兼容</h2><p>JDK9 之后模块化是升级时必须关注的内容。</p>
+<p>简单说：</p>
+<ul>
+<li><code>exports</code> 影响编译期和链接期访问。</li>
+<li><code>opens</code> 影响运行期反射访问。</li>
+<li>如果用了未导出的 JDK 内部 API，编译期可能报错。</li>
+<li>如果反射访问了未开放的包，运行期可能报错。</li>
+</ul>
+<p>JDK9 开始有 <code>--illegal-access</code> 做运行时缓冲：</p>
+<ul>
+<li><code>--illegal-access=permit</code></li>
+<li><code>--illegal-access=warn</code></li>
+<li><code>--illegal-access=debug</code></li>
+<li><code>--illegal-access=deny</code></li>
+</ul>
+<p>但到了 JDK17，<a target="_blank" rel="noopener" href="https://openjdk.org/jeps/403">JEP 403</a> 强封装 JDK internals，<code>--illegal-access</code> 基本不能再作为迁移缓冲。后面只能通过更明确的 <code>--add-opens</code> 控制运行时反射访问。</p>
+<p>我的建议是：</p>
+<ol>
+<li>能不用 JDK 内部 API 就不用。</li>
+<li>必须用的时候，最小范围加 <code>--add-opens</code> 或 <code>--add-exports</code>。</li>
+<li>不要直接复制一大串参数到所有应用。</li>
+</ol>
+<h2 id="6-适配和兼容相关"><a href="#6-适配和兼容相关" class="headerlink" title="6. 适配和兼容相关"></a>6. 适配和兼容相关</h2><p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/247">JEP 247: Compile for Older Platform Versions</a> 提供 <code>--release</code>，可以更可靠地控制编译目标平台。维护多 JDK 版本兼容库时比较有用。</p>
+<p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/238">JEP 238: Multi-Release JAR Files</a> 可以在不同 JDK 版本下使用不同 class。理论上很灵活，但实际使用要谨慎，复杂度不低。</p>
+<p>还有 Jakarta 迁移也要关注。很多老项目依赖过去 Java EE 相关包，升级时可能需要显式引入依赖，或者迁移坐标。</p>
+<h2 id="7-我的取舍"><a href="#7-我的取舍" class="headerlink" title="7. 我的取舍"></a>7. 我的取舍</h2><p>如果只从生产升级角度看，我会这么排：</p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>必看</td>
+<td>分代 ZGC、JFR、模块强封装、agent 行为变化</td>
+</tr>
+<tr>
+<td>值得采用</td>
+<td>Records、Text Blocks、switch/pattern matching、Sequenced Collections</td>
+</tr>
+<tr>
+<td>单独灰度</td>
+<td>Virtual Threads、JFR Event Streaming、CDS</td>
+</tr>
+<tr>
+<td>谨慎试点</td>
+<td>Scoped Values、Structured Concurrency、FFM、Vector API</td>
+</tr>
+<tr>
+<td>先不进主链路</td>
+<td>JDK21 中仍是 Preview/Incubator 的能力</td>
+</tr>
+</tbody></table>
+<p>结论还是那句话：JDK21 的价值不只是语法，真正影响生产升级的是运行时能力、观测能力和兼容性风险。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JDK21/" rel="tag"># JDK21</a>
+              <a href="/tags/JVM/" rel="tag"># JVM</a>
+              <a href="/tags/JEP/" rel="tag"># JEP</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/05/01/01-jdk21-upgrade-practice/" rel="prev" title="JDK21 升级实践：从收益判断到落地路径">
+      <i class="fa fa-chevron-left"></i> JDK21 升级实践：从收益判断到落地路径
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/05/03/03-virtual-threads-production-practice/" rel="next" title="虚拟线程生产实践：收益、pinning 风险与排查方法">
+      虚拟线程生产实践：收益、pinning 风险与排查方法 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E8%AF%AD%E8%A8%80%E5%92%8C%E6%97%A5%E5%B8%B8%E5%BC%80%E5%8F%91%E7%9B%B8%E5%85%B3"><span class="nav-number">1.</span> <span class="nav-text">1. 语言和日常开发相关</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-JVM-%E5%92%8C-Compiler-%E7%9B%B8%E5%85%B3"><span class="nav-number">2.</span> <span class="nav-text">2. JVM 和 Compiler 相关</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Loom%E3%80%81Panama-%E5%92%8C%E5%85%B6%E4%BB%96%E8%83%BD%E5%8A%9B"><span class="nav-number">3.</span> <span class="nav-text">3. Loom、Panama 和其他能力</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E5%BA%9F%E5%BC%83%E5%92%8C%E5%88%A0%E9%99%A4"><span class="nav-number">4.</span> <span class="nav-text">4. 废弃和删除</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E6%A8%A1%E5%9D%97%E5%8C%96%E5%92%8C%E5%85%BC%E5%AE%B9"><span class="nav-number">5.</span> <span class="nav-text">5. 模块化和兼容</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E9%80%82%E9%85%8D%E5%92%8C%E5%85%BC%E5%AE%B9%E7%9B%B8%E5%85%B3"><span class="nav-number">6.</span> <span class="nav-text">6. 适配和兼容相关</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-%E6%88%91%E7%9A%84%E5%8F%96%E8%88%8D"><span class="nav-number">7.</span> <span class="nav-text">7. 我的取舍</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="WtMonster"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">WtMonster</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/WtMonster" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;WtMonster"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://blog.csdn.net/qq_31923745" title="CSDN → https:&#x2F;&#x2F;blog.csdn.net&#x2F;qq_31923745" rel="noopener" target="_blank"><i class="fa fa-crosshairs fa-fw"></i>CSDN</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/17713895/wtmonster?tab=questions" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;17713895&#x2F;wtmonster?tab&#x3D;questions" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WtMonster</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script color='' opacity='' zIndex='' count='' src="/lib/canvas-nest/canvas-nest-nomobile.min.js"></script>
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '94910566d35d27c13869',
+      clientSecret: '43e3747775f4ad48db2916b7c53987fd5431e7e6',
+      repo        : 'wtmonster.github.io',
+      owner       : 'WtMonster',
+      admin       : ['WtMonster'],
+      id          : 'bb2e6564732fa7407a7ed3b35547175f',
+        language: 'en',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+    </div>
+</body>
+</html>
