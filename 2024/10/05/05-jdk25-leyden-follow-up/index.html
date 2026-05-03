@@ -20,15 +20,15 @@
     var CONFIG = {"hostname":"github.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":"gitalk","storage":true,"lazyload":false,"nav":null,"activeClass":"gitalk"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="这篇是 JDK21 升级之后继续关注的一些方向，主要包括虚拟线程后续演进、JFR、GC、对象头压缩，以及 Leyden。 JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。 1. JDK21 之后比较重要的变化Loom   Release JEP 我的理解    24 JEP 491: Synchronize Virtua">
+  <meta name="description" content="这篇是 JDK21 升级之后继续关注的一些方向，主要包括 Loom、JVM、JFR、GC、对象头压缩，以及 Leyden。 JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="从 JDK21 看到 JDK25：Leyden、JFR Method Timing 与虚拟线程后续演进">
-<meta property="og:url" content="https://github.com/WtMonster/WtMonster.github.io.git/2026/05/05/05-jdk25-leyden-follow-up/index.html">
+<meta property="og:title" content="JDK25 与 Leyden 相关进展记录">
+<meta property="og:url" content="https://github.com/WtMonster/WtMonster.github.io.git/2024/10/05/05-jdk25-leyden-follow-up/index.html">
 <meta property="og:site_name" content="大水怪">
-<meta property="og:description" content="这篇是 JDK21 升级之后继续关注的一些方向，主要包括虚拟线程后续演进、JFR、GC、对象头压缩，以及 Leyden。 JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。 1. JDK21 之后比较重要的变化Loom   Release JEP 我的理解    24 JEP 491: Synchronize Virtua">
+<meta property="og:description" content="这篇是 JDK21 升级之后继续关注的一些方向，主要包括 Loom、JVM、JFR、GC、对象头压缩，以及 Leyden。 JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。">
 <meta property="og:locale" content="en_US">
-<meta property="article:published_time" content="2026-05-04T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-05-03T07:39:33.106Z">
+<meta property="article:published_time" content="2024-10-04T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-12-11T16:00:00.000Z">
 <meta property="article:author" content="WtMonster">
 <meta property="article:tag" content="Java">
 <meta property="article:tag" content="JDK21">
@@ -38,7 +38,7 @@
 <meta property="article:tag" content="AOT">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://github.com/WtMonster/WtMonster.github.io.git/2026/05/05/05-jdk25-leyden-follow-up/">
+<link rel="canonical" href="https://github.com/WtMonster/WtMonster.github.io.git/2024/10/05/05-jdk25-leyden-follow-up/">
 
 
 <script id="page-configurations">
@@ -51,7 +51,7 @@
   };
 </script>
 
-  <title>从 JDK21 看到 JDK25：Leyden、JFR Method Timing 与虚拟线程后续演进 | 大水怪</title>
+  <title>JDK25 与 Leyden 相关进展记录 | 大水怪</title>
   
 
 
@@ -194,7 +194,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="https://github.com/WtMonster/WtMonster.github.io.git/2026/05/05/05-jdk25-leyden-follow-up/">
+    <link itemprop="mainEntityOfPage" href="https://github.com/WtMonster/WtMonster.github.io.git/2024/10/05/05-jdk25-leyden-follow-up/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.png">
@@ -207,7 +207,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          从 JDK21 看到 JDK25：Leyden、JFR Method Timing 与虚拟线程后续演进
+          JDK25 与 Leyden 相关进展记录
         </h1>
 
         <div class="post-meta">
@@ -217,14 +217,14 @@
               </span>
               <span class="post-meta-item-text">Posted on</span>
 
-              <time title="Created: 2026-05-05 00:00:00" itemprop="dateCreated datePublished" datetime="2026-05-05T00:00:00+08:00">2026-05-05</time>
+              <time title="Created: 2024-10-05 00:00:00" itemprop="dateCreated datePublished" datetime="2024-10-05T00:00:00+08:00">2024-10-05</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2026-05-03 15:39:33" itemprop="dateModified" datetime="2026-05-03T15:39:33+08:00">2026-05-03</time>
+                <time title="Modified: 2025-12-12 00:00:00" itemprop="dateModified" datetime="2025-12-12T00:00:00+08:00">2025-12-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -247,89 +247,134 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>这篇是 JDK21 升级之后继续关注的一些方向，主要包括虚拟线程后续演进、JFR、GC、对象头压缩，以及 Leyden。</p>
+        <p>这篇是 JDK21 升级之后继续关注的一些方向，主要包括 Loom、JVM、JFR、GC、对象头压缩，以及 Leyden。</p>
 <p>JDK21 是一个 LTS 落点，但很多能力并不是到 JDK21 就结束了。实际做升级时，还是要看后续几个版本在解决什么问题。</p>
-<h2 id="1-JDK21-之后比较重要的变化"><a href="#1-JDK21-之后比较重要的变化" class="headerlink" title="1. JDK21 之后比较重要的变化"></a>1. JDK21 之后比较重要的变化</h2><h3 id="Loom"><a href="#Loom" class="headerlink" title="Loom"></a>Loom</h3><table>
+<span id="more"></span>
+
+<h2 id="Loom（虚拟线程）"><a href="#Loom（虚拟线程）" class="headerlink" title="Loom（虚拟线程）"></a>Loom（虚拟线程）</h2><table>
 <thead>
 <tr>
 <th>Release</th>
 <th>JEP</th>
-<th>我的理解</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>24</td>
 <td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a></td>
-<td>解决虚拟线程在 <code>synchronized</code> 上 pinning 的主要问题。JDK21 中虚拟线程最大的一类坑，后续版本已经在底层处理。</td>
+<td>解决了虚拟线程在 <code>synchronized</code> 上绑定的问题。虚拟线程从此可以更大规模使用了，但类加载等场景依然需要关注。</td>
 </tr>
 <tr>
 <td>25</td>
 <td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/506">JEP 506: Scoped Values</a></td>
-<td>Scoped Values 正式交付。它提供基于显式作用域的值传递方式，适合替代一部分 ThreadLocal 上下文传递场景。</td>
+<td>引入一种全新的、基于显式作用域管理的值传递方式。</td>
 </tr>
 </tbody></table>
-<p>JDK21 里虚拟线程已经正式可用，但如果从生产大规模使用的角度看，我认为 JDK24 的 JEP 491 非常关键。</p>
-<h3 id="JVM-相关"><a href="#JVM-相关" class="headerlink" title="JVM 相关"></a>JVM 相关</h3><table>
+<p>JDK21 里虚拟线程已经正式可用，但如果从生产大规模使用角度看，我认为 JDK24 的 JEP 491 非常关键。</p>
+<h2 id="JVM-相关"><a href="#JVM-相关" class="headerlink" title="JVM 相关"></a>JVM 相关</h2><table>
 <thead>
 <tr>
 <th>Release</th>
 <th>JEP</th>
-<th>我的理解</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>25</td>
 <td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/519">JEP 519: Compact Object Headers</a></td>
-<td>Lilliput 项目的阶段性成果，把对象头压缩到更小。对象很多的应用可能会有内存收益，具体效果要看应用对象分布。</td>
+<td>完成 Lilliput 项目的第一阶段，将对象头从 128 位减小到 64 位，下一阶段目标是 32 位。对象很多的应用可能会有内存收益，具体效果和项目本身关系比较大。</td>
 </tr>
 <tr>
 <td>25</td>
 <td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/521">JEP 521: Generational Shenandoah</a></td>
-<td>Shenandoah 也进入分代方向。低延迟 GC 后面基本都在利用分代假说继续优化。</td>
+<td>Shenandoah 也进入分代方向。不过 JDK25 里默认仍是单代 Shenandoah。低延迟 GC 后面基本都在利用分代假说继续优化。</td>
 </tr>
 <tr>
 <td>25</td>
 <td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/520">JEP 520: JFR Method Timing &amp; Tracing</a></td>
-<td>JFR 支持更细的方法级耗时 tracing。这个对线上分析很有吸引力，但生产开启范围和开销要认真控制。</td>
+<td>支持对指定方法做更精确的耗时统计和 tracing。这个对线上分析很有吸引力，但生产开启范围和开销要认真控制。</td>
 </tr>
 <tr>
 <td>23 / 24</td>
 <td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> / <a target="_blank" rel="noopener" href="https://openjdk.org/jeps/490">JEP 490: ZGC: Remove the Non-Generational Mode</a></td>
-<td>ZGC 后续只有分代模式。JDK21 先引入分代 ZGC，后面继续默认化、移除非分代模式。</td>
+<td>ZGC 后续只有分代模式了。实测我认为绝大部分情况下分代 ZGC 优于单代 ZGC，少部分不符合分代假说的极端情况除外。</td>
 </tr>
 </tbody></table>
-<p>这几个点说明一个趋势：JVM 还在持续降低延迟、降低内存占用、增强观测能力。JDK21 不是终点，只是一个比较适合落地的版本。</p>
-<h2 id="2-Leyden-相关进展"><a href="#2-Leyden-相关进展" class="headerlink" title="2. Leyden 相关进展"></a>2. Leyden 相关进展</h2><h3 id="已交付"><a href="#已交付" class="headerlink" title="已交付"></a>已交付</h3><ul>
+<h2 id="语法-amp-core-lib"><a href="#语法-amp-core-lib" class="headerlink" title="语法 &amp; core-lib"></a>语法 &amp; core-lib</h2><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>24</td>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/485">JEP 485: Stream Gatherers</a></td>
+<td>提供更灵活的 stream 流处理方式，并且提供了一些内置扩展。</td>
+</tr>
+<tr>
+<td>22</td>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/456">JEP 456: Unnamed Variables &amp; Patterns</a></td>
+<td>可以使用下划线 <code>_</code> 来命名未使用的变量。</td>
+</tr>
+<tr>
+<td>23</td>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/467">JEP 467: Markdown Documentation Comments</a></td>
+<td>注释支持 Markdown 格式。</td>
+</tr>
+</tbody></table>
+<h2 id="底层库"><a href="#底层库" class="headerlink" title="底层库"></a>底层库</h2><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>JEP</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>22</td>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/454">JEP 454: Foreign Function &amp; Memory API</a></td>
+<td>提供标准 FFM API，用于调用其他语言代码以及本地内存管理。</td>
+</tr>
+<tr>
+<td>24</td>
+<td><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/484">JEP 484: Class-File API</a></td>
+<td>提供用于解析、生成和转换 Java 类文件的标准 API。</td>
+</tr>
+</tbody></table>
+<h2 id="Leyden-相关"><a href="#Leyden-相关" class="headerlink" title="Leyden 相关"></a>Leyden 相关</h2><h3 id="DONE"><a href="#DONE" class="headerlink" title="DONE"></a>DONE</h3><ul>
 <li><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></li>
 <li><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></li>
 <li><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></li>
 <li><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></li>
 </ul>
 <p>这里和我最初整理时有一个变化：JEP 516 已经是 JDK26 delivered，不再是 doing 状态。所以如果只讨论 JDK25，需要把它放到“后续继续关注”的位置；如果讨论 Leyden 路线，就可以一起看。</p>
-<h3 id="继续关注"><a href="#继续关注" class="headerlink" title="继续关注"></a>继续关注</h3><ul>
+<h3 id="DOING-继续关注"><a href="#DOING-继续关注" class="headerlink" title="DOING / 继续关注"></a>DOING / 继续关注</h3><ul>
 <li>AOT Code Compilation 相关草案。</li>
 <li>对更多 class loader 场景的支持。</li>
 <li>和 Spring Boot 打包、jar 展开、CDS 的工程化结合。</li>
 <li>启动参数、训练流程和正式启动流程的隔离。</li>
 </ul>
-<h2 id="3-核心-JEP-解读"><a href="#3-核心-JEP-解读" class="headerlink" title="3. 核心 JEP 解读"></a>3. 核心 JEP 解读</h2><h3 id="JEP-483：Ahead-of-Time-Class-Loading-amp-Linking"><a href="#JEP-483：Ahead-of-Time-Class-Loading-amp-Linking" class="headerlink" title="JEP 483：Ahead-of-Time Class Loading &amp; Linking"></a>JEP 483：Ahead-of-Time Class Loading &amp; Linking</h3><p>JEP 483 的核心是存储类加载和链接的训练数据。它关注的是应用启动时反复做的类加载、解析、链接工作，能不能提前做一部分。</p>
-<p>需要注意的是，它不是把 Java 变成 native 可执行文件，也不是直接消除 JVM 的动态性。它更像是让 JVM 在启动时少做一部分重复工作。</p>
-<p>我的理解：</p>
-<ul>
-<li>对启动速度和预热速度有帮助。</li>
-<li>对 lambda、框架启动、类加载较多的应用可能更明显。</li>
-<li>class loader 越复杂，落地越需要验证。</li>
-</ul>
-<h3 id="JEP-515：Ahead-of-Time-Method-Profiling"><a href="#JEP-515：Ahead-of-Time-Method-Profiling" class="headerlink" title="JEP 515：Ahead-of-Time Method Profiling"></a>JEP 515：Ahead-of-Time Method Profiling</h3><p>JEP 515 存储方法调用 profile，例如方法执行次数、调用路径等，让 JIT 在应用启动时就能知道一些历史执行情况。</p>
-<p>这个点很有意思。理想情况下，热点路径在首次触达时就可以更快进入较好的编译优化状态。</p>
-<p>但这里也有一个需要注意的地方：如果 JIT 更早知道热点路径，启动初期可能会更积极地做优化，CPU 资源消耗也可能更集中。所以即便有 AOT Method Profiling，流量接入也不一定能完全取消慢启动，只是慢启动可以更快、更可控。</p>
-<p>未来如果 AOT Code Compilation 继续推进，上面这个问题可能会继续改善。</p>
-<h3 id="JEP-514：Ahead-of-Time-Command-Line-Ergonomics"><a href="#JEP-514：Ahead-of-Time-Command-Line-Ergonomics" class="headerlink" title="JEP 514：Ahead-of-Time Command-Line Ergonomics"></a>JEP 514：Ahead-of-Time Command-Line Ergonomics</h3><p>JEP 514 主要是改善命令行体验，把训练/生成配置的流程包装得更顺一点。</p>
+<h2 id="核心-JEP-解读"><a href="#核心-JEP-解读" class="headerlink" title="核心 JEP 解读"></a>核心 JEP 解读</h2><h3 id="JEP-483"><a href="#JEP-483" class="headerlink" title="JEP 483"></a>JEP 483</h3><p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/483">JEP 483: Ahead-of-Time Class Loading &amp; Linking</a></p>
+<p>存储类加载和链接的训练数据。它关注的是应用启动时反复做的类加载、解析、链接工作，能不能提前做一部分。</p>
+<p>tips：</p>
+<p>对 lambda 等的优化会比较大。</p>
+<p>需要注意的是，它不是把 Java 变成 native 可执行文件，也不是直接消除 JVM 动态性。它更像是让 JVM 在启动时少做一部分重复工作。</p>
+<h3 id="JEP-515"><a href="#JEP-515" class="headerlink" title="JEP 515"></a>JEP 515</h3><p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/515">JEP 515: Ahead-of-Time Method Profiling</a></p>
+<p>存储方法调用数据，例如方法执行次数等，以便 JIT 了解方法执行情况，可以直接进行对应层级的编译优化。</p>
+<p>tips：</p>
+<p>这样做需要注意，由于 JIT 已知方法执行情况，理想情况下可以认为热点 path 代码可以在首次触达时即完成 JIT 优化。这对 CPU 资源的开销可能会比较大。</p>
+<p>也就是说，如果直接接入峰值流量，启动初期消耗的 CPU 资源可能较高，可能依然需要慢启动流程。不过流量放大的速度可以比现在快很多。</p>
+<p>未来 AOT Code Compilation 完成后，上述问题可能会继续改善。</p>
+<h3 id="JEP-514"><a href="#JEP-514" class="headerlink" title="JEP 514"></a>JEP 514</h3><p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/514">JEP 514: Ahead-of-Time Command-Line Ergonomics</a></p>
+<p>作用是改善 AOT 命令行体验，把训练和生成配置的流程包装得顺一点。</p>
 <p>这个 JEP 本身不算最核心的性能能力，但对工程化很重要。AOT 相关能力如果使用成本太高，就很难真正进入普通服务发布流程。</p>
-<p>一个实际需要注意的问题是：训练阶段和正式启动阶段不要简单复用所有启动参数。比如管理端口、监控端口、临时目录、文件路径，都可能在训练生成阶段产生冲突。工程化时最好把“训练配置”和“正式运行配置”拆开。</p>
-<h3 id="JEP-516：Ahead-of-Time-Object-Caching-with-Any-GC"><a href="#JEP-516：Ahead-of-Time-Object-Caching-with-Any-GC" class="headerlink" title="JEP 516：Ahead-of-Time Object Caching with Any GC"></a>JEP 516：Ahead-of-Time Object Caching with Any GC</h3><p>JEP 516 是 JDK26 的内容，不属于 JDK25，但它很能说明 Leyden 的方向：不只是类加载和链接，后续还会把一些对象状态提前缓存。</p>
-<p>这个方向如果成熟，对启动和预热会有更大帮助。但具体能缓存什么、和应用框架如何结合、如何保证正确性，都需要继续观察。</p>
-<h2 id="4-目前比较大的问题"><a href="#4-目前比较大的问题" class="headerlink" title="4. 目前比较大的问题"></a>4. 目前比较大的问题</h2><h3 id="class-loader"><a href="#class-loader" class="headerlink" title="class loader"></a>class loader</h3><p>Leyden 相关能力很容易受 class loader 影响。</p>
+<p>目前需要注意的是：生成训练数据时的启动参数和正式启动应用时不应该简单完全复用。例如管理端口、监控端口、临时目录、文件路径，都可能在训练生成阶段产生冲突。</p>
+<h3 id="JEP-516"><a href="#JEP-516" class="headerlink" title="JEP 516"></a>JEP 516</h3><p><a target="_blank" rel="noopener" href="https://openjdk.org/jeps/516">JEP 516: Ahead-of-Time Object Caching with Any GC</a></p>
+<p>JEP 516 是 JDK26 的内容，不属于 JDK25，但它很能说明 Leyden 的方向：不只是类加载和链接，后续还会把一些对象状态提前缓存。</p>
+<p>这个方向对启动和预热会有更大帮助。但具体到业务应用收益、和应用框架如何结合、训练数据如何设计，仍然需要继续观察。</p>
+<h2 id="目前最大的问题"><a href="#目前最大的问题" class="headerlink" title="目前最大的问题"></a>目前最大的问题</h2><h3 id="class-loader"><a href="#class-loader" class="headerlink" title="class loader"></a>class loader</h3><p>Leyden 相关能力很容易受 class loader 影响。</p>
 <p>简单 classpath 应用是一回事，真实服务经常还有：</p>
 <ul>
 <li>fat jar / nested jar。</li>
@@ -346,25 +391,25 @@
 <li><a target="_blank" rel="noopener" href="https://docs.spring.io/spring-boot/reference/packaging/efficient.html">https://docs.spring.io/spring-boot/reference/packaging/efficient.html</a></li>
 <li><a target="_blank" rel="noopener" href="https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars">https://docs.spring.io/spring-boot/docs/3.2.9/reference/html/executable-jar.html#appendix.executable-jar.nested-jars</a></li>
 </ul>
-<h3 id="GC-支持"><a href="#GC-支持" class="headerlink" title="GC 支持"></a>GC 支持</h3><p>早期 Leyden/AOT 能力和 GC 的配合有一些限制，后续 JEP 516 已经推进到 Any GC。这个方向需要继续跟。</p>
+<h3 id="GC-支持"><a href="#GC-支持" class="headerlink" title="GC 支持"></a>GC 支持</h3><p>早期 Leyden/AOT 能力和 GC 的配合有一些限制，后续 JEP 516 已经推进到 Any GC。</p>
 <p>对业务应用来说，比较理想的状态是：不需要为了启动优化放弃原本选择的 GC。</p>
 <h3 id="训练流量"><a href="#训练流量" class="headerlink" title="训练流量"></a>训练流量</h3><p>AOT profile 类能力依赖训练数据。训练数据是否代表真实流量，会直接影响收益。</p>
 <p>如果训练流量和真实流量差异很大，可能只优化了启动路径，没优化真正的业务热点路径。对复杂服务来说，训练阶段如何设计是一个工程问题，不只是 JVM 参数问题。</p>
-<h2 id="5-Leyden-和-Native-Image-的区别"><a href="#5-Leyden-和-Native-Image-的区别" class="headerlink" title="5. Leyden 和 Native Image 的区别"></a>5. Leyden 和 Native Image 的区别</h2><p>Leyden 相比 Native Image，不会直接砍掉 JVM 的动态性。对普通 Java 应用来说，这一点很重要。</p>
-<p>Native Image 更像是基于 closed-world 假设，把应用提前编译成原生可执行文件。它启动快、内存占用低，但对反射、动态代理、运行时代码生成、类加载等能力有更多约束。</p>
-<p>Leyden 的方向更像是：保留 JVM 运行时，同时把一部分可以提前做的事情提前做。比如类加载链接、方法 profile、对象缓存，未来可能还有代码编译。</p>
-<p>所以我理解它们不是简单替代关系：</p>
+<h2 id="Leyden-和-Native-Image-的区别"><a href="#Leyden-和-Native-Image-的区别" class="headerlink" title="Leyden 和 Native Image 的区别"></a>Leyden 和 Native Image 的区别</h2><p>Leyden 相比 Native Image 而言，不会砍掉 JVM 的动态性。对开发而言可以做到基本无感。</p>
+<p>Leyden 项目不打算直接合并 GraalVM 的工作，而是参考一部分 Graal 思路的同时，在项目开始时保留一部分运行时特征。</p>
+<p>相关背景：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://www.infoq.com/news/2022/06/project-leyden-delays-aot/">https://www.infoq.com/news/2022/06/project-leyden-delays-aot/</a></li>
+<li><a target="_blank" rel="noopener" href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></li>
+<li><a target="_blank" rel="noopener" href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></li>
+<li><a target="_blank" rel="noopener" href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></li>
+</ul>
+<p>我的理解是：</p>
 <ul>
 <li>Native Image 更激进，收益明显，约束也明显。</li>
 <li>Leyden 更温和，更适合大量依赖 JVM 动态性的传统 Java 服务。</li>
 </ul>
-<p>相关背景可以看：</p>
-<ul>
-<li><a target="_blank" rel="noopener" href="https://openjdk.org/projects/leyden/notes/01-beginnings">https://openjdk.org/projects/leyden/notes/01-beginnings</a></li>
-<li><a target="_blank" rel="noopener" href="https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html">https://mail.openjdk.org/pipermail/discuss/2020-April/005429.html</a></li>
-<li><a target="_blank" rel="noopener" href="https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html">https://mail.openjdk.org/pipermail/leyden-dev/2022-May/000005.html</a></li>
-</ul>
-<h2 id="6-我后面会重点关注什么"><a href="#6-我后面会重点关注什么" class="headerlink" title="6. 我后面会重点关注什么"></a>6. 我后面会重点关注什么</h2><ol>
+<h2 id="需要关注的工作"><a href="#需要关注的工作" class="headerlink" title="需要关注的工作"></a>需要关注的工作</h2><ol>
 <li>JEP 491 后，虚拟线程在真实服务里的风险是否明显降低。</li>
 <li>JFR Method Timing &amp; Tracing 的生产使用方式和开销。</li>
 <li>Compact Object Headers 对对象密集型服务的实际内存收益。</li>
@@ -372,9 +417,7 @@
 <li>Leyden 和 Spring Boot、CDS、jar 展开的集成路径。</li>
 <li>AOT profile/缓存能力对启动、预热、扩容速度的改善。</li>
 </ol>
-<h2 id="7-小结"><a href="#7-小结" class="headerlink" title="7. 小结"></a>7. 小结</h2><p>JDK21 升级完以后，不代表这条线结束。</p>
-<p>JDK21 是一个适合落地的版本；JDK24/JDK25/JDK26 展示的是后续演进方向：虚拟线程更成熟、JFR 更强、GC 更偏分代化、对象布局更紧凑、Leyden 开始改善启动和预热。</p>
-<p>对应用团队来说，不需要盲目追每一个版本，但需要知道这些变化在解决什么问题。这样下一次升级就不是临时补课，而是持续演进。</p>
+<p>JDK21 升级完以后，不代表这条线结束。JDK21 是一个适合落地的版本；JDK24/JDK25/JDK26 展示的是后续演进方向。</p>
 
     </div>
 
@@ -398,8 +441,8 @@
         
     <div class="post-nav">
       <div class="post-nav-item">
-    <a href="/2026/05/04/04-jfr-practical-guide/" rel="prev" title="JFR 实战：低开销观测 JVM 与定位性能问题">
-      <i class="fa fa-chevron-left"></i> JFR 实战：低开销观测 JVM 与定位性能问题
+    <a href="/2024/09/22/04-jfr-practical-guide/" rel="prev" title="JFR 实战记录">
+      <i class="fa fa-chevron-left"></i> JFR 实战记录
     </a></div>
       <div class="post-nav-item"></div>
     </div>
@@ -461,7 +504,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-JDK21-%E4%B9%8B%E5%90%8E%E6%AF%94%E8%BE%83%E9%87%8D%E8%A6%81%E7%9A%84%E5%8F%98%E5%8C%96"><span class="nav-number">1.</span> <span class="nav-text">1. JDK21 之后比较重要的变化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Loom"><span class="nav-number">1.1.</span> <span class="nav-text">Loom</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JVM-%E7%9B%B8%E5%85%B3"><span class="nav-number">1.2.</span> <span class="nav-text">JVM 相关</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Leyden-%E7%9B%B8%E5%85%B3%E8%BF%9B%E5%B1%95"><span class="nav-number">2.</span> <span class="nav-text">2. Leyden 相关进展</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%B2%E4%BA%A4%E4%BB%98"><span class="nav-number">2.1.</span> <span class="nav-text">已交付</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%A7%E7%BB%AD%E5%85%B3%E6%B3%A8"><span class="nav-number">2.2.</span> <span class="nav-text">继续关注</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-%E6%A0%B8%E5%BF%83-JEP-%E8%A7%A3%E8%AF%BB"><span class="nav-number">3.</span> <span class="nav-text">3. 核心 JEP 解读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-483%EF%BC%9AAhead-of-Time-Class-Loading-amp-Linking"><span class="nav-number">3.1.</span> <span class="nav-text">JEP 483：Ahead-of-Time Class Loading &amp; Linking</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-515%EF%BC%9AAhead-of-Time-Method-Profiling"><span class="nav-number">3.2.</span> <span class="nav-text">JEP 515：Ahead-of-Time Method Profiling</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-514%EF%BC%9AAhead-of-Time-Command-Line-Ergonomics"><span class="nav-number">3.3.</span> <span class="nav-text">JEP 514：Ahead-of-Time Command-Line Ergonomics</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-516%EF%BC%9AAhead-of-Time-Object-Caching-with-Any-GC"><span class="nav-number">3.4.</span> <span class="nav-text">JEP 516：Ahead-of-Time Object Caching with Any GC</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E7%9B%AE%E5%89%8D%E6%AF%94%E8%BE%83%E5%A4%A7%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">4.</span> <span class="nav-text">4. 目前比较大的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#class-loader"><span class="nav-number">4.1.</span> <span class="nav-text">class loader</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GC-%E6%94%AF%E6%8C%81"><span class="nav-number">4.2.</span> <span class="nav-text">GC 支持</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%AD%E7%BB%83%E6%B5%81%E9%87%8F"><span class="nav-number">4.3.</span> <span class="nav-text">训练流量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-Leyden-%E5%92%8C-Native-Image-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">5.</span> <span class="nav-text">5. Leyden 和 Native Image 的区别</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E6%88%91%E5%90%8E%E9%9D%A2%E4%BC%9A%E9%87%8D%E7%82%B9%E5%85%B3%E6%B3%A8%E4%BB%80%E4%B9%88"><span class="nav-number">6.</span> <span class="nav-text">6. 我后面会重点关注什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-%E5%B0%8F%E7%BB%93"><span class="nav-number">7.</span> <span class="nav-text">7. 小结</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Loom%EF%BC%88%E8%99%9A%E6%8B%9F%E7%BA%BF%E7%A8%8B%EF%BC%89"><span class="nav-number">1.</span> <span class="nav-text">Loom（虚拟线程）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JVM-%E7%9B%B8%E5%85%B3"><span class="nav-number">2.</span> <span class="nav-text">JVM 相关</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%AD%E6%B3%95-amp-core-lib"><span class="nav-number">3.</span> <span class="nav-text">语法 &amp; core-lib</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BA%95%E5%B1%82%E5%BA%93"><span class="nav-number">4.</span> <span class="nav-text">底层库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Leyden-%E7%9B%B8%E5%85%B3"><span class="nav-number">5.</span> <span class="nav-text">Leyden 相关</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#DONE"><span class="nav-number">5.1.</span> <span class="nav-text">DONE</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DOING-%E7%BB%A7%E7%BB%AD%E5%85%B3%E6%B3%A8"><span class="nav-number">5.2.</span> <span class="nav-text">DOING &#x2F; 继续关注</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83-JEP-%E8%A7%A3%E8%AF%BB"><span class="nav-number">6.</span> <span class="nav-text">核心 JEP 解读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-483"><span class="nav-number">6.1.</span> <span class="nav-text">JEP 483</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-515"><span class="nav-number">6.2.</span> <span class="nav-text">JEP 515</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-514"><span class="nav-number">6.3.</span> <span class="nav-text">JEP 514</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JEP-516"><span class="nav-number">6.4.</span> <span class="nav-text">JEP 516</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%89%8D%E6%9C%80%E5%A4%A7%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">7.</span> <span class="nav-text">目前最大的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#class-loader"><span class="nav-number">7.1.</span> <span class="nav-text">class loader</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GC-%E6%94%AF%E6%8C%81"><span class="nav-number">7.2.</span> <span class="nav-text">GC 支持</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%AD%E7%BB%83%E6%B5%81%E9%87%8F"><span class="nav-number">7.3.</span> <span class="nav-text">训练流量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Leyden-%E5%92%8C-Native-Image-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">8.</span> <span class="nav-text">Leyden 和 Native Image 的区别</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9C%80%E8%A6%81%E5%85%B3%E6%B3%A8%E7%9A%84%E5%B7%A5%E4%BD%9C"><span class="nav-number">9.</span> <span class="nav-text">需要关注的工作</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -667,7 +710,7 @@ NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
       repo        : 'wtmonster.github.io',
       owner       : 'WtMonster',
       admin       : ['WtMonster'],
-      id          : '4e44e0254fb8d5001b16b32cd8dc1dd6',
+      id          : 'd2c8243b0bd276c33656297232028139',
         language: 'en',
       distractionFreeMode: true
     });
